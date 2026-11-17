@@ -86,7 +86,8 @@ test('unmatched habits show as emerging once three people report them', async ()
 });
 
 test('a one-time code produces one contribution', async () => {
-  const token = await store.createWait();
+  const { token, reservedId } = await store.createWait();
+  assert.equal((await store.openWaitFor(reservedId)).token, token);
   const me = await store.createProfile();
   await store.addContribution(sub(['clean-slate']), { profileId: me.id, waitToken: token });
   await assert.rejects(store.addContribution(sub(['clean-slate']), { profileId: me.id, waitToken: token }), /already been used/);
@@ -111,4 +112,18 @@ test('an analysis result is written to the contribution and its habits', async (
   assert.equal(c.patterns[0].catalog_id, 'plan-before-code');
   assert.equal(c.patterns[0].quadrant, 'steer');
   assert.equal(c.analysis.verdict, 'accept');
+});
+
+test('headline numbers count recent answers, unless there are too few of them', async () => {
+  const old = new Date(Date.now() - 300 * 864e5);
+  for (let i = 0; i < 30; i++) await add(sub(['blind-accept']), { createdAt: old });
+  for (let i = 0; i < 10; i++) await add(sub(['plan-before-code']));
+  // Only 10 recent answers: everyone counts.
+  let r = radar(await store.contributions({ status: 'accepted' }));
+  assert.equal(r.total, 40);
+  for (let i = 0; i < 10; i++) await add(sub(['plan-before-code']));
+  // 20 recent answers: the old ones no longer shape the shares.
+  r = radar(await store.contributions({ status: 'accepted' }));
+  assert.equal(r.total, 20);
+  assert.deepEqual(r.patterns.map((p) => [p.id, p.share]), [['plan-before-code', 100]]);
 });

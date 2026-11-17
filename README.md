@@ -27,7 +27,7 @@ npm test                  # needs the llmpatterns_test database
 | `/c/<id>` | A company's results. First slide: its name, if it has one. Last slide: asks colleagues to contribute. Results appear at 5 counted people |
 | `/c/<id>/contribute` | The company's contribute page, to send to colleagues |
 | `/admin` | Contributions, review, and how to run the analysis |
-| `/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request) |
+| `/u/<id>/contribute.md`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). `/contribute.md` is a copy for reading |
 
 There is no sign-up. The browser that created a page holds a signed cookie that
 lets it rename, protect or delete the page. A page with a password asks for it;
@@ -35,10 +35,15 @@ for a personal page the password also restores ownership on another device.
 
 ## How a contribution flows
 
-1. A contribute page creates a one-time code (table `waits`) and shows
-   `Fetch <base>/contribute.md?t=<code> and follow the instructions in it.`
-2. The assistant posts JSON to `/api/contributions?t=<code>`. The code works
-   once and expires after two days.
+1. A contribute page shows one line to paste:
+   - for yourself, `Fetch <base>/u/<id>/contribute.md and follow the instructions in it.`
+     The `<id>` is the address your results page will get.
+   - for a company, `Fetch <base>/c/<id>/contribute.md and follow the instructions in it.`
+2. The prompt served at that address carries a one-time code (table `waits`)
+   in its submit URL, `/api/contributions?t=<code>`. The code works once and
+   expires after two days. A personal contribute page waits for the answer
+   and then opens the results; after a company prompt, the assistant opens or
+   hands over the link to the person's own results page.
 3. `lib/shape.js` keeps only known fields and listed values, caps lengths, and
    removes URLs, emails, paths and token-like strings. `lib/security.js` then
    screens the remaining free text for signs of prompt injection.

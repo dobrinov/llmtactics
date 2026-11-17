@@ -112,8 +112,17 @@ if (root && dataEl) {
       open(order[(order.indexOf(current) + Number(stepper.dataset.step) + order.length) % order.length]);
     }
   });
+  // While the drawer is open the keyboard belongs to it: Esc closes it, and the
+  // arrow keys step through the habits instead of moving the slides underneath.
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !drawer.hidden) close();
+    if (drawer.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === 'Escape') return close();
+    const step = { ArrowRight: 1, PageDown: 1, ArrowLeft: -1, PageUp: -1 }[e.key];
+    if (!step) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    const at = order.indexOf(current);
+    open(order[(at + step + order.length) % order.length]);
   });
 }
 
@@ -160,7 +169,14 @@ if (deck) {
     const n = Math.max(0, Math.min(slides.length - 1, i));
     deck.scrollTo({ left: slides[n].offsetLeft, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   };
+  // A slide that was scrolled goes back to its top once it is left, so it
+  // starts from the beginning the next time it is shown.
+  const rewind = (slide) => {
+    slide.scrollTop = 0;
+    for (const el of slide.querySelectorAll('.tool-strip, .country-list, [data-scroll-list] ul')) el.scrollTo(0, 0);
+  };
   function mark(i) {
+    if (i !== current) rewind(slides[current]);
     current = i;
     dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
     for (const a of arrows) {
@@ -191,7 +207,7 @@ if (deck) {
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
   });
   const start = slides.findIndex((s) => `#${s.id}` === location.hash);
-  if (start > 0) deck.scrollLeft = slides[start].offsetLeft;
+  if (start > 0) deck.scrollTo({ left: slides[start].offsetLeft, behavior: 'instant' });
 }
 
 // Long lists on slides: arrow buttons scroll the list, and switch off at either end.
@@ -229,3 +245,30 @@ for (const form of document.querySelectorAll('[data-details-form]')) {
   form.addEventListener('input', () => { status.textContent = ''; clearTimeout(timer); timer = setTimeout(save, 700); });
   form.addEventListener('change', save);
 }
+
+// The world map: a country's name and its number of people follow the pointer.
+for (const map of document.querySelectorAll('[data-map]')) {
+  const tip = map.parentElement.querySelector('[data-map-tip]');
+  const [name, note] = tip.children;
+  const hide = () => { tip.hidden = true; };
+  map.addEventListener('pointermove', (e) => {
+    const c = e.target.closest('[data-tip]');
+    if (!c) return hide();
+    name.textContent = c.dataset.tip;
+    note.textContent = c.dataset.tipNote;
+    tip.hidden = false;
+    tip.style.left = `${Math.max(8, Math.min(innerWidth - tip.offsetWidth - 8, e.clientX + 14))}px`;
+    tip.style.top = `${Math.max(8, e.clientY - tip.offsetHeight - 12)}px`;
+  });
+  map.addEventListener('pointerleave', hide);
+}
+
+// Previous and Next inside a setup's details: swap one popover for the other.
+// (Left to the browser, a popover opened from inside another stacks on top of it.)
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.setup-pop .drawer-nav [popovertarget]');
+  if (!btn) return;
+  e.preventDefault();
+  btn.closest('.setup-pop').hidePopover();
+  document.getElementById(btn.getAttribute('popovertarget'))?.showPopover();
+});

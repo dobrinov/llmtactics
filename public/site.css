@@ -144,7 +144,9 @@ p { margin: 0; }
 /* ---------- home: slides ---------- */
 .deck-page { height: 100vh; height: 100svh; display: flex; flex-direction: column; overflow: hidden; }
 .deck-page main { flex: 1; min-height: 0; }
-.deck { height: 100%; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; }
+/* No smooth scrolling here: a page that opens on a later slide (#map, say) must
+   appear there at once. Moving between slides is animated by site.js. */
+.deck { height: 100%; display: flex; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scrollbar-width: none; }
 .deck::-webkit-scrollbar { display: none; }
 .slide { flex: 0 0 100%; scroll-snap-align: start; overflow-y: auto; padding: 40px var(--gutter) 120px; display: flex; flex-wrap: wrap; align-items: safe center; align-content: safe center; gap: 48px 64px; }
 .slide.column { flex-direction: column; flex-wrap: nowrap; align-items: stretch; justify-content: safe center; gap: 32px; }
@@ -517,17 +519,35 @@ details.more[open] > summary { display: none; }
 .tool-card .meter { width: 100%; }
 .slide-head h2 { margin: 0; font: 700 clamp(28px, 3vw, 44px)/1.05 var(--head); letter-spacing: -0.02em; color: var(--ink); }
 
-/* Popular setups: one card per combination of tools. */
-.setups { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(420px, 100%), 1fr)); gap: 16px; }
-.setups .card { gap: 14px; }
-.setup-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.setup-tool { display: inline-flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 14px; background: var(--soft); }
-.setup-tool b { color: var(--ink); }
-.setup-tool .label { font-size: 11px; }
-.setups .plus { font: 700 20px var(--head); color: var(--muted); }
-.setup-share { display: flex; align-items: baseline; gap: 10px; }
-.setups p { margin: 0; }
-.setup-item { display: inline-flex; align-items: center; gap: 8px; }
+/* Development environments: a compact row per setup, tools as overlapping circles. */
+.k-harness { --kind: var(--q0); } .k-editor { --kind: var(--q1); } .k-multiplexer { --kind: var(--q3); }
+.k-review { --kind: var(--q2); } .k-connector { --kind: #334155; } .k-chat, .k-other { --kind: #64748b; }
+.kind-legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 18px; max-width: 520px; font-size: 14px; font-weight: 500; color: #334155; }
+.kind-legend li { display: flex; align-items: center; gap: 8px; }
+.kind-legend .sw { width: 14px; height: 14px; border-radius: 999px; background: var(--kind); }
+.setup-rows { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(480px, 100%), 1fr)); gap: 10px 20px; }
+.setup-row { width: 100%; display: flex; align-items: center; gap: 16px; min-height: 84px; padding: 12px 20px; background: #fff; border: 1px solid var(--line); border-radius: 18px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.setup-row:hover { border-color: #94a3b8; }
+.setup-row .rank { flex: 0 0 22px; font: 600 18px var(--head); color: #64748b; }
+.setup-row .share { flex: 0 0 62px; text-align: right; font: 700 28px/1 var(--head); letter-spacing: -0.02em; color: var(--ink); }
+.setup-row .meter { flex: 1 1 80px; }
+.setup-stack { display: flex; flex: 0 0 auto; padding-left: 12px; }
+.setup-dot { position: relative; flex: 0 0 auto; display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 999px; border: 3px solid #fff; box-sizing: border-box; background: var(--kind); color: #fff; font: 700 15px var(--head); }
+.setup-stack .setup-dot { margin-left: -12px; }
+.setup-stack .setup-dot:hover { z-index: 2; }
+.setup-dot .tip { position: absolute; left: 50%; bottom: 58px; transform: translateX(-50%); z-index: 5; display: none; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 10px; background: var(--ink); color: #fff; white-space: nowrap; text-align: left; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3); pointer-events: none; }
+.setup-dot .tip b { font: 600 14px var(--sans); }
+.setup-dot .tip span { font: 400 12px var(--sans); color: #cbd5e1; }
+.setup-dot:hover .tip { display: flex; }
+.setup-pop { width: min(560px, calc(100vw - 32px)); }
+.setup-pop .figure { font: 700 72px/0.95 var(--head); letter-spacing: -0.03em; color: var(--ink); }
+.setup-detail { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.setup-detail li { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 14px; background: #f1f4f8; }
+.setup-detail .setup-dot { width: 44px; height: 44px; border: 0; font-size: 14px; }
+.setup-detail .who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.setup-detail .who b { font-size: 17px; color: var(--ink); }
+.setup-detail .of { text-align: right; white-space: nowrap; }
+.setup-pop .drawer-nav { margin-top: 0; }
 
 /* The radar slide: the radar alone, centred and as large as the window allows;
    the area filter and the legend sit small in the corners. */
@@ -579,3 +599,36 @@ details.more[open] > summary { display: none; }
 .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 24px; margin: 0; }
 .kv dt { font-size: 12px; color: var(--muted); }
 .kv dd { margin: 0; font-weight: 600; color: var(--ink); }
+
+/* ---------- world map and country switches ---------- */
+.world-slide { gap: 14px; }
+.world { width: 100%; max-height: calc(100svh - 250px); min-height: 180px; flex: 0 1 auto; }
+.world path { fill: #dfe5ee; stroke: #f5f6f8; stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+.world path.on { fill: var(--q0); }
+.world path.on:hover { fill: var(--ink); }
+
+/* The contribute page keeps its heading and the two tabs in the same place
+   whichever tab is open: content hangs from the top, not centred on its height. */
+.contribute-bare { justify-content: flex-start; padding-top: clamp(48px, 16svh, 180px); }
+.contribute-bare h1 { min-height: 1.15em; }
+.contribute-bare > .lede { min-height: 4.8em; }
+
+/* A page with one centred screen (a company still collecting answers). */
+.slide.centered-text { justify-content: center; }
+.slide.centered-text .progress { margin-inline: auto; }
+.slide.centered-text .owner-panel { text-align: left; width: min(100%, 900px); }
+.prompt.centered { width: min(100%, 980px); margin-inline: auto; text-align: center; padding: 22px 26px; }
+
+/* What the site is, at the top of the contribute pages. */
+.about { margin: 0 auto; max-width: 760px; padding: 14px 20px; border-radius: 16px; background: #fff; border: 1px solid var(--line); font-size: 15px; line-height: 1.5; color: var(--muted); text-align: center; }
+.about b { color: var(--ink); }
+.about a { font-weight: 600; white-space: nowrap; }
+.contribute-bare { padding-top: clamp(32px, 9svh, 110px); }
+.contribute-bare .about { margin-bottom: 10px; }
+
+.map-tip { position: fixed; z-index: 30; pointer-events: none; display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 14px; white-space: nowrap; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.3); }
+.map-tip[hidden] { display: none; }
+.map-tip span { font-size: 12px; color: #cbd5e1; }
+/* The environments header: title on the left, the legend of kinds on the right. */
+.slide-head.row { width: 100%; display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 40px; text-align: left; }
+.slide-head.row > div { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }

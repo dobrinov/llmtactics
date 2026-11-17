@@ -79,6 +79,7 @@ for (let i = 0; i < count; i++) {
   const heavy = role === 'product' || role === 'manager' || role === 'design' ? 0 : 1;
   const raw = {
     assistant,
+    country: chance(0.93) ? pickOne(['us', 'de', 'gb', 'bg', 'in', 'fr', 'nl', 'pl', 'br', 'ca', 'es', 'au', 'jp', 'se', 'ua', 'za', 'sg', 'mx', 'ng', 'ar'], [22, 11, 10, 9, 8, 6, 5, 5, 4, 4, 3, 3, 3, 2, 2, 1, 1, 1, 1, 1]) : undefined,
     role: chance(0.9) ? role : undefined,
     history_basis: 'seed data',
     experience: {

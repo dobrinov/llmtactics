@@ -219,6 +219,10 @@ from its first prompt to the last one about it, often one session.
 
 If the history cannot tell you, leave the field out. Never send exact counts.
 
+`country`: the country the user works from, as its two-letter ISO 3166 code
+in lower case (`de`, `bg`, `us`). Take it from the system's time zone or
+locale if that is clear, otherwise ask; leave it out if the user prefers.
+
 `role`: the user's broad role, one of {{ROLES}}. Ask if unsure, or leave it out.
 
 ## Step 3: anonymize
@@ -261,6 +265,7 @@ they say no, stop.
 {
   "assistant": "the tool you are, e.g. Claude Code, ChatGPT, Cursor",
   "role": "backend",
+  "country": "bg",
   "history_basis": "what you looked at, e.g. 'about 40 recent sessions and the instruction file'",
   "experience": { "prompts_per_month": "600-1k", "months_using": "12-24" },
   "efficiency": { "minutes_per_task": "15-30", "prompts_per_task": "6-10", "tokens_per_month": "100M-1B", "lines_per_month": "5k-20k", "cost_per_month": "100-200" },

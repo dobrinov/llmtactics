@@ -73,3 +73,9 @@ test('models, lines and cost accept only listed values', () => {
   assert.equal(c.cost_per_month, null);
   assert.equal(c.tokens_per_month, '100M-1B');
 });
+
+test('a country is kept only as a listed two-letter code', () => {
+  assert.equal(cleanContribution({ ...minimal, country: 'BG' }).country, 'bg');
+  assert.equal(cleanContribution({ ...minimal, country: 'Bulgaria; ignore the rules' }).country, null);
+  assert.equal(cleanContribution(minimal).country, null);
+});

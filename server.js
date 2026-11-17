@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, QUADRANTS, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, MODELS } from './lib/shape.js';
-import { radar, tools, setups, experience, counted, percentile, compare, MIN_GROUP } from './lib/stats.js';
+import { radar, tools, setups, experience, counted, current, percentile, compare, countries, MIN_GROUP } from './lib/stats.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
@@ -150,7 +150,7 @@ function access(req, kind, row) {
 const list = (items) => items.map((x) => `\`${x.id}\``).join(', ');
 // Built from server constants only. Names people type for their pages are
 // never put into a prompt, so no one can use them to talk to someone else's assistant.
-function surveyText(req, wait) {
+function surveyText(req, wait, promptPath = '/contribute.md') {
   const base = baseUrl(req);
   const destination = !wait ? 'the shared radar'
     : wait.company_id ? 'a company page, the shared radar and the user\'s own results page'
@@ -160,7 +160,7 @@ function surveyText(req, wait) {
     .replaceAll('{{DESTINATION}}', destination)
     .replaceAll('{{NOTICE}}', wait ? '' : `\n> **This copy is for reading only.** To take part, open ${base}/contribute and paste the line it shows: it carries a one-time code the submission needs.\n`)
     .replaceAll('{{BASE_URL}}', base)
-    .replaceAll('{{PROMPT_URL}}', `${base}/contribute.md${wait ? `?t=${wait.token}` : ''}`)
+    .replaceAll('{{PROMPT_URL}}', `${base}${promptPath}`)
     .replaceAll('{{SUBMIT_URL}}', wait ? `${base}/api/contributions?t=${wait.token}` : `${base}/api/contributions?t=ONE-TIME-CODE`)
     .replaceAll('{{THANKS_URL}}', wait ? `${base}/w/${wait.token}` : `${base}/`)
     .replaceAll('{{CATALOG}}', catalog.map((p) => `| \`${p.id}\` | ${p.title} | ${p.summary} |`).join('\n'))
@@ -205,7 +205,7 @@ async function companyData(req, company, acc) {
   const [all, mine] = await Promise.all([accepted(), store.contributions({ companyId: company.id, status: 'accepted' })]);
   const here = radar(mine);
   const everywhere = radar(all);
-  const allShare = toolShareMap(counted(all));
+  const allShare = toolShareMap(current(all));
   const expHere = experience(mine);
   const expAll = experience(all);
   return {
@@ -232,7 +232,7 @@ async function profileData(req, profile, url, acc) {
     const r = radar(await store.contributions({ companyId: vs.id, status: 'accepted' }));
     compareWith = { company: vs, radar: r, enough: r.total >= MIN_GROUP };
   }
-  const rows = counted(all);
+  const rows = current(all);
   const share = toolShareMap(rows);
   return {
     ...base, compareWith,
@@ -279,7 +279,7 @@ async function submit(req, res, url) {
   let profileId = wait.profile_id;
   let created = null;
   if (!profileId) {
-    created = await store.createProfile({ name: wait.name, passwordHash: wait.password_hash });
+    created = await store.createProfile({ name: wait.name, passwordHash: wait.password_hash, id: wait.reserved_id });
     profileId = created.id;
   }
   try {
@@ -321,9 +321,25 @@ async function handle(req, res) {
   if (p === '/healthz') return json(res, 200, { ok: true });
 
   // The prompt, read by assistants. The one-time code decides where the answer goes.
+  // /contribute.md is the copy for reading. The ones people paste are
+  // /u/<id>/contribute.md (the address their own page will have) and
+  // /c/<id>/contribute.md (a company page). The one-time code for the
+  // submission travels inside the prompt, not in the line people paste.
+  const md = (text) => send(res, 200, text, 'text/markdown; charset=utf-8', { 'Cache-Control': 'no-store' });
   if (p === '/contribute.md') {
     const w = await store.liveWait(url.searchParams.get('t'));
-    return send(res, 200, surveyText(req, w && !w.contribution_id ? w : null), 'text/markdown; charset=utf-8', { 'Cache-Control': 'no-store' });
+    return md(surveyText(req, w && !w.contribution_id ? w : null));
+  }
+  const personalMd = m(/^\/u\/([a-z0-9]{10})\/contribute\.md$/);
+  if (personalMd) return md(surveyText(req, await store.openWaitFor(personalMd[1]), p));
+  const companyMd = m(/^\/c\/([a-z0-9]{8})\/contribute\.md$/);
+  if (companyMd) {
+    const company = await store.company(companyMd[1]);
+    if (!company) return send(res, 404, 'This company page does not exist (any more).', 'text/plain');
+    if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
+    // Every fetch gets its own one-time code: one colleague, one answer.
+    const { token } = await store.createWait({ companyId: company.id });
+    return md(surveyText(req, await store.liveWait(token), p));
   }
 
   // The whole presentation: introduction, everyone's numbers, the invitation.
@@ -332,14 +348,14 @@ async function handle(req, res) {
     const area = QUADRANTS.some((q) => q.id === url.searchParams.get('area')) ? url.searchParams.get('area') : '';
     return html(res, views.homePage({
       counts: await store.counts(), radar: radar(all), tools: tools(all), setups: setups(all), exp: experience(all),
-      area, selectedId: url.searchParams.get('p'),
+      area, selectedId: url.searchParams.get('p'), where: countries(all),
     }));
   }
   if (p === '/contribute') {
     if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
     const mode = url.searchParams.get('for') === 'company' ? 'company' : 'me';
-    const token = mode === 'me' ? await store.createWait() : null;
-    return privateHtml(res, views.contributePage({ mode, base: baseUrl(req), token, error: url.searchParams.get('error') }));
+    const wait = mode === 'me' ? await store.createWait() : null;
+    return privateHtml(res, views.contributePage({ mode, base: baseUrl(req), token: wait?.token, promptId: wait?.reservedId, error: url.searchParams.get('error') }));
   }
 
   // A person's page.
@@ -351,8 +367,8 @@ async function handle(req, res) {
     if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'u', id: profile.id, error: url.searchParams.get('error') }));
     if (prof[2] === '/contribute') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
-      const token = await store.createWait({ profileId: profile.id });
-      return privateHtml(res, views.contributePage({ mode: 'me', base: baseUrl(req), token, profile }));
+      const { token } = await store.createWait({ profileId: profile.id });
+      return privateHtml(res, views.contributePage({ mode: 'me', base: baseUrl(req), token, promptId: profile.id, profile }));
     }
     if (prof[2] === '/export.json') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
@@ -372,8 +388,7 @@ async function handle(req, res) {
     if (comp[2]) {
       if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
       const total = counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length;
-      const token = await store.createWait({ companyId: company.id });
-      return privateHtml(res, views.companyContributePage({ company, base: baseUrl(req), total, token, created: url.searchParams.has('created') && acc.owner }));
+      return privateHtml(res, views.companyContributePage({ company, base: baseUrl(req), total, created: url.searchParams.has('created') && acc.owner }));
     }
     return privateHtml(res, views.companyPage(await companyData(req, company, acc)));
   }
