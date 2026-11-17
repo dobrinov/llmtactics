@@ -1,0 +1,20 @@
+{
+  "name": "llmtactics",
+  "private": true,
+  "type": "module",
+  "description": "llmtactics.com: a slide deck of how people work with LLMs, built from what their assistants find in their own history",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.js",
+    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "seed": "node --env-file-if-exists=.env scripts/seed.js",
+    "analyse": "node --env-file-if-exists=.env scripts/analyse.js",
+    "test": "node --env-file-if-exists=.env --test"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.10.0",
+    "postgres": "^4.1.1"
+  }
+}

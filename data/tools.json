@@ -1,0 +1,20 @@
+{
+  "_comment": "Known tools: the name shown, other ways people write it, and the link each tool name opens (in a new tab). Tools not listed here link to a web search for their name. \"category\" is one of the ids in TOOL_CATEGORIES (lib/shape.js). \"about\" is one plain sentence shown in the tool's details. Only add links to the product's own site or repository.",
+  "tools": [
+    {"name": "Claude Code", "aliases": ["claude-code"], "url": "https://claude.com/claude-code", "about": "Anthropic's coding agent. It works in your terminal and editor, reads the codebase and makes changes.", "category": "harness"},
+    {"name": "Claude", "aliases": ["claude.ai", "claude app"], "url": "https://claude.ai", "about": "Anthropic's chat assistant, on the web, desktop and phone.", "category": "chat"},
+    {"name": "ChatGPT", "aliases": ["chat gpt", "openai"], "url": "https://chatgpt.com", "about": "OpenAI's chat assistant, on the web, desktop and phone.", "category": "chat"},
+    {"name": "Cursor", "aliases": [], "url": "https://cursor.com", "about": "A code editor built around an AI assistant that can edit across files.", "category": "editor"},
+    {"name": "GitHub Copilot", "aliases": ["copilot"], "url": "https://github.com/features/copilot", "about": "GitHub's AI assistant: suggestions while you type, chat in the editor, and an agent on github.com.", "category": "editor"},
+    {"name": "Codex CLI", "aliases": ["codex", "openai codex"], "url": "https://github.com/openai/codex", "about": "OpenAI's open-source coding agent for the terminal.", "category": "harness"},
+    {"name": "Gemini", "aliases": [], "url": "https://gemini.google.com", "about": "Google's chat assistant.", "category": "chat"},
+    {"name": "Gemini CLI", "aliases": [], "url": "https://github.com/google-gemini/gemini-cli", "about": "Google's open-source coding agent for the terminal.", "category": "harness"},
+    {"name": "Windsurf", "aliases": [], "url": "https://windsurf.com", "about": "A code editor built around an AI agent.", "category": "editor"},
+    {"name": "MCP connectors", "aliases": ["mcp", "mcp servers"], "url": "https://modelcontextprotocol.io", "about": "Model Context Protocol servers. They let an assistant read and act in other tools, such as trackers, chat and logs.", "category": "connector"},
+    {"name": "tmux", "aliases": [], "url": "https://github.com/tmux/tmux", "about": "A terminal multiplexer: several terminal sessions in one window, kept running in the background.", "category": "multiplexer"},
+    {"name": "cmux", "aliases": [], "url": "https://cmux.com", "about": "A terminal app for running many coding agents side by side, with a notice when one needs you.", "category": "multiplexer"},
+    {"name": "T3 Code", "aliases": ["t3code", "t3 chat code"], "url": "https://github.com/pingdotgg/t3code", "about": "An app that puts several coding agents behind one window.", "category": "multiplexer"},
+    {"name": "Diffity", "aliases": [], "url": "https://github.com/nilbuild/diffity", "about": "A diff viewer for reading and commenting on changes, then handing the comments back to the agent.", "category": "review"},
+    {"name": "agent-browser", "aliases": ["agent browser"], "url": "https://github.com/vercel-labs/agent-browser", "about": "A command line browser for AI agents, so they can open and test web pages themselves.", "category": "connector"}
+  ]
+}
