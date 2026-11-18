@@ -219,10 +219,6 @@ p { margin: 0; }
 .hero h1 { font-size: clamp(40px, 6vw, 68px); line-height: 1.02; letter-spacing: -0.03em; }
 .hero .lede { font-size: 20px; margin: 0; }
 .hero-radar { flex: 0 1 440px; min-width: 260px; display: block; }
-.steps { list-style: none; margin: 28px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 28px; }
-.steps li { display: flex; flex-direction: column; gap: 8px; }
-.steps .n { font: 700 44px/1 var(--head); }
-.steps p { color: var(--muted); }
 .n.q0 { color: var(--q0); } .n.q1 { color: var(--q1); } .n.q2 { color: var(--q2); } .n.q3 { color: var(--q3); }
 
 /* ---------- page heads and layouts ---------- */
@@ -714,3 +710,22 @@ details.more[open] > summary { display: none; }
 .frame .card .details-form { align-items: flex-end; }
 .frame .card form .btn { align-self: flex-start; }
 #code-form .field { max-width: 420px; }
+
+/* An invitation: what to do, and what does and does not leave the computer. */
+.invite { display: flex; flex-wrap: wrap; gap: 20px; }
+.invite > .card:first-child { flex: 3 1 520px; gap: 20px; }
+.invite > .card:last-child { flex: 2 1 380px; gap: 16px; }
+.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 20px; counter-reset: step; }
+.steps li { counter-increment: step; display: flex; gap: 16px; align-items: flex-start; }
+.steps li::before { content: counter(step); flex: none; width: 36px; height: 36px; border-radius: 999px; background: var(--ink); color: #fff; font: 700 16px/36px var(--head); text-align: center; }
+.steps li > span { display: flex; flex-direction: column; gap: 2px; }
+.steps strong { font-size: 17px; color: var(--ink); }
+.invite .label { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; }
+.invite .label.sent { color: var(--q2); } .invite .label.never { color: var(--danger); }
+.invite .plain-list { gap: 4px; }
+.invite .banner { display: block; padding: 14px 16px; font-size: 15px; line-height: 1.5; }
+.prompt-card { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 16px 28px; }
+.prompt-card > div { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.prompt-card > .btn { flex: none; align-self: center; }
+.prompt-card a { color: #fff; }
+.prompt-card .copied { background: #5ecfc2; }

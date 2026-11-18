@@ -265,12 +265,14 @@ async function profileData(req, profile, url, acc) {
 
 // The page where a page is renamed, protected or deleted. Without the owner
 // grant it asks for the editor's code first.
-function editPage(req, res, url, kind, row, acc) {
+const inviteLink = async (req, profileId) => `${baseUrl(req)}/contribute?from=${await store.inviteCode(profileId)}`;
+async function editPage(req, res, url, kind, row, acc) {
   const error = url.searchParams.get('error');
   if (!acc.owner) return privateHtml(res, views.editGatePage({ kind, row, error: Boolean(error) }));
   return privateHtml(res, views.editPage({
     kind, row, code: shownCode(req, kind, row.id), saved: url.searchParams.has('saved'),
     error: error && error !== 'wrong' ? error.slice(0, 200) : null,
+    invite: kind === 'u' ? await inviteLink(req, row.id) : null,
   }));
 }
 
@@ -391,7 +393,9 @@ async function handle(req, res) {
     if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
     const mode = url.searchParams.get('for') === 'company' ? 'company' : 'me';
     const wait = mode === 'me' ? await store.createWait() : null;
-    return privateHtml(res, views.contributePage({ mode, base: baseUrl(req), token: wait?.token, promptId: wait?.reservedId, error: url.searchParams.get('error') }));
+    // An invitation link names its sender, and nothing else about them.
+    const inviter = mode === 'me' ? await store.profileByInvite(url.searchParams.get('from')) : null;
+    return privateHtml(res, views.contributePage({ mode, base: baseUrl(req), token: wait?.token, promptId: wait?.reservedId, error: url.searchParams.get('error'), inviter: inviter ? { name: inviter.name } : null }));
   }
 
   // A person's page.
@@ -412,7 +416,7 @@ async function handle(req, res) {
       const contributions = (await store.contributions({ profileId: profile.id })).map(({ payload, ...c }) => c);
       return json(res, 200, { page: `/u/${profile.id}`, name: profile.name, created_at: profile.created_at, contributions }, { 'Content-Disposition': `attachment; filename="${SITE}-${profile.id}.json"` });
     }
-    return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, url, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null }));
+    return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, url, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null, invite: acc.owner ? await inviteLink(req, profile.id) : null }));
   }
 
   // A company's page and its contribute page.

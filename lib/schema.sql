@@ -22,6 +22,11 @@ CREATE TABLE IF NOT EXISTS companies (
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS editor_code_hash text;
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS editor_code_hash text;
 
+-- The code in a person's invitation link, /contribute?from=<code>: it names
+-- the inviter on the page a friend opens without giving away /u/<id>.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS invite_code text;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_invite_code ON profiles(invite_code);
+
 -- One contribution as it arrived (already cleaned against the schema in
 -- lib/shape.js). status: pending -> accepted | rejected, or flagged for a
 -- person to look at. Only accepted ones count towards shared numbers.
