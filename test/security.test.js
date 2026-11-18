@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { hashPassword, verifyPassword, createSigner, injectionSigns, freeText } from '../lib/security.js';
+import { hashPassword, verifyPassword, createSigner, injectionSigns, freeText, newEditorCode, hashEditorCode, verifyEditorCode } from '../lib/security.js';
 import { cleanContribution } from '../lib/shape.js';
 import { decide, userMessage, SCHEMA } from '../lib/analysis.js';
 
@@ -88,4 +88,18 @@ test('a submission cannot close its own data block', () => {
   assert.equal(msg.match(/<\/submission>/g).length, 1);
   assert.equal(msg.match(/<submission>/g).length, 1);
   assert.equal(SCHEMA.additionalProperties, false);
+});
+
+test('an editor’s code verifies however it is typed, and only against its own hash', () => {
+  const code = newEditorCode();
+  assert.match(code, /^([a-hj-km-np-z2-9]{5}-){3}[a-hj-km-np-z2-9]{5}$/);
+  assert.notEqual(code, newEditorCode());
+  const stored = hashEditorCode(code);
+  assert.ok(verifyEditorCode(code, stored));
+  assert.ok(verifyEditorCode(` ${code.toUpperCase().replaceAll('-', ' ')} `, stored));
+  assert.ok(!verifyEditorCode(newEditorCode(), stored));
+  assert.ok(!verifyEditorCode(code.slice(0, -1), stored));
+  assert.ok(!verifyEditorCode('', stored));
+  assert.ok(!verifyEditorCode(code, null));
+  assert.ok(!verifyEditorCode('', hashEditorCode('')));
 });

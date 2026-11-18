@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, QUADRANTS, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, MODELS } from './lib/shape.js';
 import { radar, tools, setups, experience, counted, current, percentile, compare, countries, MIN_GROUP } from './lib/stats.js';
-import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual } from './lib/security.js';
+import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
 
@@ -103,7 +103,7 @@ const cleanName = (v, max) => String(v ?? '').replace(/[\u0000-\u001f\u007fâ€‹-â
 const newPassword = (v) => {
   const s = String(v ?? '');
   if (!s) return null;
-  if (s.length < 8 || s.length > 200) throw Object.assign(new Error('A password needs 8 to 200 characters.'), { status: 400 });
+  if (s.length > 200) throw Object.assign(new Error('A password can have at most 200 characters.'), { status: 400 });
   return hashPassword(s);
 };
 
@@ -113,6 +113,10 @@ const newPassword = (v) => {
 // "vc:<id>:<fp>" may view a password-protected page, where <fp> is a
 // fingerprint of the password hash, so changing the password locks everyone
 // else out again.
+//
+// "k:<kind>:<id>:<code>:<until>" is an editor's code that was just made for
+// the page, kept for a few minutes so the browser that made it can be shown
+// it (the server itself keeps only its hash).
 
 const fingerprint = (hash) => (hash ? crypto.createHash('sha256').update(hash).digest('base64url').slice(0, 12) : '');
 const MAX_GRANTS = 60;
@@ -122,8 +126,10 @@ function grantsOf(req) {
   if (!raw) return [];
   try { const list = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8')); return Array.isArray(list) ? list.filter((g) => typeof g === 'string') : []; } catch { return []; }
 }
+const SHOW_CODE_MS = 15 * 60_000;
+const freshCode = (g) => !g.startsWith('k:') || Number(g.split(':')[4]) > Date.now();
 function grantCookie(req, add = [], remove = () => false) {
-  const list = [...new Set([...grantsOf(req).filter((g) => !remove(g)), ...add])].slice(-MAX_GRANTS);
+  const list = [...new Set([...grantsOf(req).filter((g) => freshCode(g) && !remove(g)), ...add])].slice(-MAX_GRANTS);
   return cookie('access', signer.sign(Buffer.from(JSON.stringify(list)).toString('base64url')), { maxAge: 365 * 864e2, secure: SECURE });
 }
 
@@ -135,6 +141,20 @@ function isAdmin(req) {
   return tag === 'admin' && Number(expires) > Date.now() && safeEqual(fp, fingerprint(hashOfAdmin));
 }
 const hashOfAdmin = ADMIN_PASSWORD ? `admin:${ADMIN_PASSWORD}` : '';
+
+// Makes a new editor's code for a page (the old one stops working) and returns
+// it with the cookie entry that lets this browser be shown it for a while.
+async function issueCode(kind, id) {
+  const code = newEditorCode();
+  await (kind === 'u' ? store.updateProfile(id, { editor_code_hash: hashEditorCode(code) }) : store.updateCompany(id, { editor_code_hash: hashEditorCode(code) }));
+  return { code, entry: `k:${kind}:${id}:${code}:${Date.now() + SHOW_CODE_MS}` };
+}
+const sameCodeOf = (kind, id) => (g) => g.startsWith(`k:${kind}:${id}:`);
+// The code this browser was just given for a page, while it may still be shown.
+function shownCode(req, kind, id) {
+  const g = grantsOf(req).filter((x) => sameCodeOf(kind, id)(x) && freshCode(x)).at(-1);
+  return g ? g.split(':')[3] : null;
+}
 
 // kind: 'u' | 'c'
 function access(req, kind, row) {
@@ -243,6 +263,17 @@ async function profileData(req, profile, url, acc) {
   };
 }
 
+// The page where a page is renamed, protected or deleted. Without the owner
+// grant it asks for the editor's code first.
+function editPage(req, res, url, kind, row, acc) {
+  const error = url.searchParams.get('error');
+  if (!acc.owner) return privateHtml(res, views.editGatePage({ kind, row, error: Boolean(error) }));
+  return privateHtml(res, views.editPage({
+    kind, row, code: shownCode(req, kind, row.id), saved: url.searchParams.has('saved'),
+    error: error && error !== 'wrong' ? error.slice(0, 200) : null,
+  }));
+}
+
 setInterval(() => store.pruneWaits().catch(() => {}), 3600_000).unref();
 
 // Where a finished wait leads. The first browser that asks gets the owner grant
@@ -251,7 +282,12 @@ async function resolveWait(req, w) {
   if (!w.contribution_id) return { status: 'waiting' };
   const to = `/u/${w.profile_id}${w.company_id ? `?vs=${w.company_id}` : ''}`;
   if (grantsOf(req).includes(`ou:${w.profile_id}`)) return { status: 'done', redirect: to };
-  if (await store.claimWait(w.token)) return { status: 'done', redirect: to, grant: `ou:${w.profile_id}` };
+  if (await store.claimWait(w.token)) {
+    // A new page gets its editor's code now, for the browser that owns it.
+    const profile = await store.profile(w.profile_id);
+    const issued = profile && !profile.editor_code_hash ? await issueCode('u', profile.id) : null;
+    return { status: 'done', redirect: to, grant: [`ou:${w.profile_id}`, ...(issued ? [issued.entry] : [])] };
+  }
   return { status: 'done', redirect: to };
 }
 
@@ -310,7 +346,7 @@ async function handle(req, res) {
     const w = await store.liveWait(waitApi[1]);
     if (!w) return json(res, 404, { status: 'expired' });
     const r = await resolveWait(req, w);
-    return json(res, 200, { status: r.status, redirect: r.redirect }, r.grant ? { 'Set-Cookie': grantCookie(req, [r.grant]) } : {});
+    return json(res, 200, { status: r.status, redirect: r.redirect }, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
   }
 
   if (req.method === 'POST') return post(req, res, url, p, m);
@@ -359,12 +395,13 @@ async function handle(req, res) {
   }
 
   // A person's page.
-  const prof = m(/^\/u\/([a-z0-9]{10})(\/contribute|\/export\.json)?$/);
+  const prof = m(/^\/u\/([a-z0-9]{10})(\/contribute|\/export\.json|\/edit)?$/);
   if (prof) {
     const profile = await store.profile(prof[1]);
     if (!profile) return html(res, views.notFoundPage(), 404);
     const acc = access(req, 'u', profile);
     if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'u', id: profile.id, error: url.searchParams.get('error') }));
+    if (prof[2] === '/edit') return editPage(req, res, url, 'u', profile, acc);
     if (prof[2] === '/contribute') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
       const { token } = await store.createWait({ profileId: profile.id });
@@ -375,20 +412,21 @@ async function handle(req, res) {
       const contributions = (await store.contributions({ profileId: profile.id })).map(({ payload, ...c }) => c);
       return json(res, 200, { page: `/u/${profile.id}`, name: profile.name, created_at: profile.created_at, contributions }, { 'Content-Disposition': `attachment; filename="${SITE}-${profile.id}.json"` });
     }
-    return privateHtml(res, views.profilePage(await profileData(req, profile, url, acc)));
+    return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, url, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null }));
   }
 
   // A company's page and its contribute page.
-  const comp = m(/^\/c\/([a-z0-9]{8})(\/contribute)?$/);
+  const comp = m(/^\/c\/([a-z0-9]{8})(\/contribute|\/edit)?$/);
   if (comp) {
     const company = await store.company(comp[1]);
     if (!company) return html(res, views.notFoundPage(), 404);
     const acc = access(req, 'c', company);
     if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'c', id: company.id, error: url.searchParams.get('error') }));
+    if (comp[2] === '/edit') return editPage(req, res, url, 'c', company, acc);
     if (comp[2]) {
       if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
       const total = counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length;
-      return privateHtml(res, views.companyContributePage({ company, base: baseUrl(req), total, created: url.searchParams.has('created') && acc.owner }));
+      return privateHtml(res, views.companyContributePage({ company, base: baseUrl(req), total, created: url.searchParams.has('created') && acc.owner, code: acc.owner ? shownCode(req, 'c', company.id) : null }));
     }
     return privateHtml(res, views.companyPage(await companyData(req, company, acc)));
   }
@@ -400,7 +438,7 @@ async function handle(req, res) {
     if (!w) return redirect(res, '/');
     const r = await resolveWait(req, w);
     if (r.status === 'waiting') return redirect(res, '/contribute');
-    return redirect(res, r.redirect, r.grant ? { 'Set-Cookie': grantCookie(req, [r.grant]) } : {});
+    return redirect(res, r.redirect, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
   }
   if (p === '/privacy') return html(res, views.privacyPage());
 
@@ -448,7 +486,8 @@ async function post(req, res, url, p, m) {
     let passwordHash;
     try { passwordHash = newPassword(form.password); } catch (e) { return redirect(res, `/contribute?for=company&error=${encodeURIComponent(e.message)}`); }
     const company = await store.createCompany({ name: cleanName(form.name, 80), passwordHash });
-    return redirect(res, `/c/${company.id}/contribute?created`, { 'Set-Cookie': grantCookie(req, [`oc:${company.id}`]) });
+    const issued = await issueCode('c', company.id);
+    return redirect(res, `/c/${company.id}/contribute?created`, { 'Set-Cookie': grantCookie(req, [`oc:${company.id}`, issued.entry]) });
   }
 
   // Unlocking a password-protected page.
@@ -461,23 +500,38 @@ async function post(req, res, url, p, m) {
     const form = await readForm(req);
     if (!row.password_hash) return redirect(res, `/${kind}/${id}`);
     if (!verifyPassword(String(form.password || ''), row.password_hash)) return redirect(res, `/${kind}/${id}?error=wrong`);
-    // A person's own password also makes them the owner of their page again (on a new device, say).
-    const add = [`v${kind}:${id}:${fingerprint(row.password_hash)}`, ...(kind === 'u' ? [`ou:${id}`] : [])];
-    return redirect(res, `/${kind}/${id}`, { 'Set-Cookie': grantCookie(req, add) });
+    // The password only opens the page. Editing it takes the editor's code.
+    return redirect(res, `/${kind}/${id}`, { 'Set-Cookie': grantCookie(req, [`v${kind}:${id}:${fingerprint(row.password_hash)}`]) });
+  }
+
+  // The editor's code makes this browser an owner of the page.
+  const editUnlock = m(/^\/(u|c)\/([a-z0-9]{8,10})\/edit\/unlock$/);
+  if (editUnlock) {
+    const [, kind, id] = editUnlock;
+    if (limited(req, `edit:${kind}:${id}`, 8, 15 * 60_000)) return send(res, 429, 'Too many attempts. Try again in 15 minutes.', 'text/plain');
+    const row = kind === 'u' ? await store.profile(id) : await store.company(id);
+    if (!row) return html(res, views.notFoundPage(), 404);
+    const form = await readForm(req);
+    if (!verifyEditorCode(form.code, row.editor_code_hash)) return redirect(res, `/${kind}/${id}/edit?error=wrong`);
+    return redirect(res, `/${kind}/${id}/edit`, { 'Set-Cookie': grantCookie(req, [`o${kind}:${id}`]) });
   }
 
   // Owner actions on a page.
-  const owned = m(/^\/(u|c)\/([a-z0-9]{8,10})\/(settings|delete|forget)$/);
+  const owned = m(/^\/(u|c)\/([a-z0-9]{8,10})\/(settings|delete|forget|code)$/);
   if (owned) {
     const [, kind, id, action] = owned;
     const row = kind === 'u' ? await store.profile(id) : await store.company(id);
     if (!row) return html(res, views.notFoundPage(), 404);
-    if (action === 'forget') return redirect(res, '/', { 'Set-Cookie': grantCookie(req, [], (g) => g.split(':')[1] === id) });
+    if (action === 'forget') return redirect(res, '/', { 'Set-Cookie': grantCookie(req, [], (g) => g.split(':')[1] === id || g.split(':')[2] === id) });
     if (!access(req, kind, row).owner) return send(res, 403, 'Only the person who started this page can change it.', 'text/plain');
     const update = kind === 'u' ? (f) => store.updateProfile(id, f) : (f) => store.updateCompany(id, f);
+    if (action === 'code') {
+      const issued = await issueCode(kind, id);
+      return redirect(res, `/${kind}/${id}/edit?code=new`, { 'Set-Cookie': grantCookie(req, [issued.entry], sameCodeOf(kind, id)) });
+    }
     if (action === 'delete') {
       await (kind === 'u' ? store.deleteProfile(id) : store.deleteCompany(id));
-      return redirect(res, '/', { 'Set-Cookie': grantCookie(req, [], (g) => g.split(':')[1] === id) });
+      return redirect(res, '/', { 'Set-Cookie': grantCookie(req, [], (g) => g.split(':')[1] === id || g.split(':')[2] === id) });
     }
     const form = await readForm(req);
     const fields = {};
@@ -485,11 +539,11 @@ async function post(req, res, url, p, m) {
     let grant = [];
     if (form.remove_password === 'on') fields.password_hash = null;
     else if (form.password) {
-      try { fields.password_hash = newPassword(form.password); } catch (e) { return send(res, 400, e.message, 'text/plain'); }
+      try { fields.password_hash = newPassword(form.password); } catch (e) { return redirect(res, `/${kind}/${id}/edit?error=${encodeURIComponent(e.message)}`); }
       grant = [`v${kind}:${id}:${fingerprint(fields.password_hash)}`];
     }
     if (Object.keys(fields).length) await update(fields);
-    return redirect(res, `/${kind}/${id}#manage`, grant.length ? { 'Set-Cookie': grantCookie(req, grant) } : {});
+    return redirect(res, `/${kind}/${id}/edit?saved`, grant.length ? { 'Set-Cookie': grantCookie(req, grant) } : {});
   }
 
   // ---------- admin ----------

@@ -704,3 +704,13 @@ details.more[open] > summary { display: none; }
 @media (max-width: 760px), (max-height: 640px) { .slide.column { align-items: stretch; } }
 
 .spark.q3 i { background: #dcc3f3; } .spark.q3 i.last { background: var(--q3); }
+
+/* A page's editor's code, shown once to the browser that was given it. */
+.banner.code-banner { background: #fef3c7; color: #78350f; text-align: left; }
+.code-banner code { font: 500 17px var(--mono); color: #451a03; margin-left: 6px; user-select: all; }
+.code-banner .btn { flex: none; }
+.frame .banner { margin: 0; }
+.banner + .banner + .radar-body .radar-visual { width: min(100%, 60vw, calc(100svh - 480px)); }
+.frame .card .details-form { align-items: flex-end; }
+.frame .card form .btn { align-self: flex-start; }
+#code-form .field { max-width: 420px; }

@@ -17,7 +17,7 @@ document.addEventListener('click', async (e) => {
 
 // Forms that need a second thought: <form data-confirm="...">
 document.addEventListener('submit', (e) => {
-  const msg = e.target.dataset.confirm;
+  const msg = e.target.dataset?.confirm;
   if (msg && !window.confirm(msg)) e.preventDefault();
 });
 
@@ -234,7 +234,6 @@ for (const form of document.querySelectorAll('[data-details-form]')) {
   const save = async () => {
     clearTimeout(timer);
     const password = form.elements.password.value;
-    if (password && password.length < 8) { status.textContent = 'A password needs at least 8 characters.'; return; }
     try {
       const r = await fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)), credentials: 'same-origin' });
       const body = await r.json().catch(() => ({}));

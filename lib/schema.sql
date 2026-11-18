@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS companies (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- The editor's code of a page, as a SHA-256: whoever holds the code can edit
+-- or delete the page from any browser. Empty for pages older than the codes.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS editor_code_hash text;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS editor_code_hash text;
+
 -- One contribution as it arrived (already cleaned against the schema in
 -- lib/shape.js). status: pending -> accepted | rejected, or flagged for a
 -- person to look at. Only accepted ones count towards shared numbers.

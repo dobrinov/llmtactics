@@ -30,8 +30,11 @@ npm test                  # needs the llmpatterns_test database
 | `/u/<id>/contribute.md`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). `/contribute.md` is a copy for reading |
 
 There is no sign-up. The browser that created a page holds a signed cookie that
-lets it rename, protect or delete the page. A page with a password asks for it;
-for a personal page the password also restores ownership on another device.
+lets it rename, protect or delete the page at `/u/<id>/edit` or `/c/<id>/edit`.
+Each new page also gets an editor's code, shown once to that browser: typing it
+on the edit page gives any other browser the same rights. Only its hash is
+stored; the owner can swap it for a new one. A page with a password asks for
+it, but the password only opens the page.
 
 ## How a contribution flows
 
