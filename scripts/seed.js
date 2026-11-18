@@ -54,7 +54,9 @@ const purposeShare = [0.81, 0.64, 0.47, 0.41, 0.38, 0.35, 0.19, 0.14, 0.12];
 
 const companies = [await store.createCompany({ name: 'Example Inc' }), await store.createCompany({ name: null })];
 // Model families and how common each is at the start and the end of the year.
-const modelPool = [['claude-opus', 0.25, 0.5], ['claude-sonnet', 0.6, 0.55], ['claude-haiku', 0.1, 0.2], ['claude-fable', 0, 0.25], ['gpt', 0.5, 0.4], ['openai-reasoning', 0.2, 0.1], ['gemini-pro', 0.15, 0.25], ['gemini-flash', 0.05, 0.12], ['local', 0.04, 0.08]];
+// Then the versions of each, older first: older answers lean to the older one.
+const modelPool = [['claude-opus', 0.25, 0.5, ['4.1', '4.5']], ['claude-sonnet', 0.6, 0.55, ['4', '4.5']], ['claude-haiku', 0.1, 0.2, ['3.5', '4.5']], ['claude-fable', 0, 0.25, ['5']], ['gpt', 0.5, 0.4, ['4.1', '5']], ['openai-reasoning', 0.2, 0.1, ['3', '4']], ['gemini-pro', 0.15, 0.25, ['2.5', '3']], ['gemini-flash', 0.05, 0.12, ['2', '2.5']], ['local', 0.04, 0.08, []]];
+const withVersion = (id, versions, daysAgo) => (versions.length && chance(0.85) ? `${id}@${versions.length > 1 && chance(daysAgo > 150 ? 0.2 : 0.8) ? versions[1] : versions[0]}` : id);
 const now = Date.now();
 
 for (let i = 0; i < count; i++) {
@@ -94,7 +96,7 @@ for (let i = 0; i < count; i++) {
       lines_per_month: heavy && chance(0.7) ? pickOne(LINES_RANGES.map((r) => r.id), daysAgo > 180 ? [20, 34, 28, 12, 5, 1] : [8, 24, 32, 20, 12, 4]) : undefined,
       cost_per_month: chance(0.65) ? pickOne(COST_RANGES.map((r) => r.id), daysAgo > 180 ? [22, 44, 18, 10, 5, 1] : [10, 34, 24, 18, 11, 3]) : undefined,
     },
-    models: modelPool.filter(([, then, today]) => chance(today + (then - today) * (daysAgo / 360))).map(([id]) => id),
+    models: modelPool.filter(([, then, today]) => chance(today + (then - today) * (daysAgo / 360))).map(([id, , , versions]) => withVersion(id, versions, daysAgo)),
     purposes: PURPOSES.filter((_, k) => chance(purposeShare[k])).map((p) => p.id),
     patterns,
     tools,

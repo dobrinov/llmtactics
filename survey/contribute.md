@@ -183,7 +183,11 @@ without its real name.
 
 Then list the model families the user's work ran on, as `models`: every one
 of these ids the history shows in real use (not a one-off try):
-{{MODELS}}. Send ids only, never a free-text name.
+{{MODELS}}. Send ids only, never a free-text name. When the history shows
+which version, add it after an `@`: `claude-opus@4.5`, `gpt@5`,
+`gemini-pro@2.5`, `openai-reasoning@3` (for o3). A version is digits and dots
+only, with at most one letter at the end (`4o`); list a family once per
+version in real use, and leave the version off when you cannot tell.
 
 Then list what the user uses assistants **for**, as `purposes`: every one of
 these ids that a fair share of the history supports:

@@ -49,7 +49,7 @@ test('only accepted contributions reach the shared numbers', async () => {
 
 test('shares, tools, purposes, models and experience', async () => {
   await add(sub(['plan-before-code', 'clean-slate'], { models: ['claude-opus'] }));
-  await add(sub(['plan-before-code'], { experience: { prompts_per_month: '3k+' }, models: ['claude-opus', 'gpt'] }));
+  await add(sub(['plan-before-code'], { experience: { prompts_per_month: '3k+' }, models: ['claude-opus@4.5', 'gpt'] }));
   await add(sub(['tests-as-proof'], { tools: [{ name: 'Cursor', kind: 'editor' }] }));
   await add(sub(['plan-before-code']));
   const all = await store.contributions({ status: 'accepted' });
@@ -59,7 +59,7 @@ test('shares, tools, purposes, models and experience', async () => {
   assert.equal(t.tools[0].share, 75);
   assert.equal(t.purposes[0].share, 100);
   // Models are a share of the people who named any.
-  assert.deepEqual(t.models.map((m) => [m.name, m.share]), [['Claude Opus', 100], ['GPT', 50]]);
+  assert.deepEqual(t.models.map((m) => [m.name, m.share]), [['Claude Opus', 50], ['Claude Opus 4.5', 50], ['GPT', 50]]);
   assert.equal(experience(all).prompts.median, 870); // 600 + (2 of 3 answers in 600–1k) × 400
   assert.equal(percentile(counted(all), PROMPT_RANGES, 'prompts_per_month', '3k+'), 88);
 });

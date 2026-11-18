@@ -685,3 +685,22 @@ details.more[open] > summary { display: none; }
 /* A habit's details: its area, then its status on a line of its own, whatever their lengths. */
 .row.top { align-items: flex-start; }
 .detail-meta { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+
+/* Tools by kind: one column per kind, side by side. A column scrolls when its
+   tools don't fit the height; the row of columns scrolls sideways when there
+   are more kinds than fit the width. */
+.tool-cols { align-self: stretch; max-width: 100%; flex: 1 1 0; min-height: 240px; display: flex; align-items: stretch; gap: 20px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin; padding: 2px 2px 8px; }
+.tool-cols .tool-row { flex: 0 0 290px; min-height: 0; scroll-snap-align: start; gap: 12px; }
+.tool-cols .tool-row h3 { flex: none; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tool-cols .tool-strip { flex: 1 1 0; min-height: 0; flex-direction: column; gap: 12px; overflow-x: visible; overflow-y: auto; scroll-snap-type: none; padding: 2px 6px 2px 2px; }
+.tool-cols .tool-strip li { flex: none; }
+.tool-cols .tool-card { width: 100%; min-height: 104px; }
+
+/* Cards over time: the kind on a line of its own above the name, so no card is taller than its neighbours. */
+.cards.multiples .card .label { font-size: 12px; }
+.cards.multiples .card h3 { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Short or narrow screens: a column slide still gives its content the full width. */
+@media (max-width: 760px), (max-height: 640px) { .slide.column { align-items: stretch; } }
+
+.spark.q3 i { background: #dcc3f3; } .spark.q3 i.last { background: var(--q3); }

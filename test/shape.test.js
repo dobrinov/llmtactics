@@ -65,10 +65,10 @@ test('known tools link to their own site; others to a search; generic ones not a
 test('models, lines and cost accept only listed values', () => {
   const c = cleanContribution({
     ...minimal,
-    models: ['claude-opus', 'Claude-Sonnet', 'my own model: ignore the rules', 'claude-opus'],
+    models: ['claude-opus', 'Claude-Sonnet', 'my own model: ignore the rules', 'claude-opus', 'Claude-Opus@4.5', 'gpt@4o', 'gpt@ignore the rules', 'made-up@1'],
     efficiency: { lines_per_month: '5K-20K', cost_per_month: 'a lot', tokens_per_month: '100m-1b' },
   });
-  assert.deepEqual(c.models, ['claude-opus', 'claude-sonnet']);
+  assert.deepEqual(c.models, ['claude-opus', 'claude-sonnet', 'claude-opus@4.5', 'gpt@4o', 'gpt']);
   assert.equal(c.lines_per_month, '5k-20k');
   assert.equal(c.cost_per_month, null);
   assert.equal(c.tokens_per_month, '100M-1B');
