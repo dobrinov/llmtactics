@@ -21,7 +21,7 @@ npm test                  # needs the llmpatterns_test database
 
 | URL | What |
 | --- | --- |
-| `/` | The presentation: introduction, radar, habits, tools, development environments, tools over time, models over time, prompts and lines of code over time, cost over time (dollars and tokens), purposes, time per task, costly habits, roles, emerging habits, and the invitation to take part |
+| `/` | The presentation: introduction, radar, habits, tools, development environments, tools over time, models over time, prompts and lines of code over time, cost over time (dollars and tokens), where the tokens go, purposes, time per task, costly habits, roles, emerging habits, and the invitation to take part |
 | `/contribute` | One line to paste, with an optional name and password for the page it creates. `?for=company` creates a company page instead |
 | `/u/<id>` | One person's results. First slide: their name, if they gave one. Last slide: run again, or start a company page |
 | `/c/<id>` | A company's results. First slide: its name, if it has one. Last slide: asks colleagues to contribute. Results appear at 5 counted people |
@@ -54,6 +54,30 @@ it, but the password only opens the page.
    something). The person's own page shows it at once.
 5. The analysis (`npm run analyse`) or the admin accepts it. Only `accepted`
    contributions count in the shared and company numbers.
+
+## What the survey measures
+
+Every answer describes the person's **last 30 days**, not their whole
+history: people change tools and ways of working within months, and Claude
+Code deletes transcripts after about 30 days anyway. The charts over time
+come from answers arriving month after month, not from anyone's old history.
+
+Within the 30 days the assistant counts instead of sampling. The prompt
+carries a script, `survey/measure.py` (put in place of `{{MEASURE}}`), that
+Claude Code runs as it is. It reads every transcript, including the
+subagents' (which a `projects/*/*.jsonl` glob misses), counts each model
+reply once (a reply is written on several lines and copied into resumed
+sessions), and prints only totals, medians and model names. From it come the
+prompts, tokens and lines a month, the median session, and three token
+measurements: what a typical request takes in (`context_per_request`), where
+the cost of the tokens goes (`cost_split`: re-reading, loading, writing) and
+the share subagents use (`subagent_share`). Other assistants are told to
+count the same things by the same rules, or to leave the token fields out.
+
+Habits are capped at 8 and need evidence: three separate sessions in the 30
+days, or configuration that enforces them. A habit is `active` or `new`; the
+survey no longer asks for habits people gave up, or for how long they have
+used LLMs (the server still accepts both from older prompts).
 
 ## Untrusted text
 

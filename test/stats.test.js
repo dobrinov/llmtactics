@@ -127,3 +127,22 @@ test('headline numbers count recent answers, unless there are too few of them', 
   assert.equal(r.total, 20);
   assert.deepEqual(r.patterns.map((p) => [p.id, p.share]), [['plan-before-code', 100]]);
 });
+
+test('token measurements: the cost split, the context and subagents, from those who measured', async () => {
+  const measured = (reread, loaded, written, subagent_share, context_per_request) =>
+    sub(['plan-before-code'], { efficiency: { cost_split: { reread, loaded, written }, subagent_share, context_per_request } });
+  for (let i = 0; i < 4; i++) await add(measured(60, 30, 10, 0, '50k-100k'));
+  await add(sub(['plan-before-code']));
+  // Four people measured: too few to show.
+  let e = experience(await store.contributions({ status: 'accepted' })).efficiency;
+  assert.equal(e.split, null);
+  assert.equal(e.subagents, null);
+
+  await add(measured(70, 20, 10, 20, '100k-200k'));
+  await add(measured(80, 15, 5, 40, '100k-200k'));
+  e = experience(await store.contributions({ status: 'accepted' })).efficiency;
+  assert.deepEqual(e.split, { answered: 6, reread: 65, loaded: 26, written: 9 });
+  assert.deepEqual(e.subagents, { answered: 6, share: 33, median: 20 });
+  assert.equal(e.context.answered, 6);
+  assert.equal(e.context.median, 88000);
+});

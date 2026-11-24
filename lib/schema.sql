@@ -54,6 +54,14 @@ CREATE TABLE IF NOT EXISTS contributions (
 );
 -- Added after the first release.
 ALTER TABLE contributions ADD COLUMN IF NOT EXISTS country text;
+-- Measured from token records: what a typical request takes in (a range), where
+-- the cost of the tokens goes (three percentages), and the share of tokens
+-- that subagents used.
+ALTER TABLE contributions ADD COLUMN IF NOT EXISTS context_per_request text;
+ALTER TABLE contributions ADD COLUMN IF NOT EXISTS cost_reread smallint;
+ALTER TABLE contributions ADD COLUMN IF NOT EXISTS cost_loaded smallint;
+ALTER TABLE contributions ADD COLUMN IF NOT EXISTS cost_written smallint;
+ALTER TABLE contributions ADD COLUMN IF NOT EXISTS subagent_share smallint;
 
 CREATE INDEX IF NOT EXISTS contributions_profile ON contributions(profile_id);
 CREATE INDEX IF NOT EXISTS contributions_company ON contributions(company_id);

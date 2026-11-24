@@ -1,7 +1,7 @@
 // Fills the database with invented contributions so the pages have something
 // to show during development. Usage: npm run seed [-- --count 300] [-- --reset]
 import { openDb } from '../lib/db.js';
-import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES } from '../lib/shape.js';
+import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES } from '../lib/shape.js';
 
 const args = process.argv.slice(2);
 const count = Number(args[args.indexOf('--count') + 1]) || 300;
@@ -34,21 +34,24 @@ const extras = [
 ];
 const assistants = ['Claude Code', 'Cursor', 'ChatGPT', 'GitHub Copilot', 'Codex CLI', 'Gemini CLI'];
 const toolPool = [
-  ['Claude Code', 'assistant', 'building features end to end in the terminal', 0.58],
-  ['ChatGPT', 'assistant', 'research, explanations, first drafts', 0.44],
+  ['Claude Code', 'harness', 'building features end to end in the terminal', 0.58],
+  ['ChatGPT', 'chat', 'research, explanations, first drafts', 0.44],
   ['Cursor', 'editor', 'edits inside the file being looked at', 0.37],
   ['MCP connectors', 'connector', 'reading tickets, chat threads and error logs', 0.33],
-  ['GitHub Copilot', 'extension', 'autocomplete while typing', 0.26],
+  ['GitHub Copilot', 'editor', 'autocomplete while typing', 0.26],
   ['a review bot', 'review', 'a second pass on pull requests', 0.17],
-  ['Codex CLI', 'assistant', 'long-running tasks in the background', 0.14],
-  ['agent-browser', 'extension', 'letting the agent test its own UI', 0.12],
-  ['Gemini', 'assistant', 'long documents and second opinions', 0.11],
-  ['tmux', 'other', 'one session per task, side by side', 0.19],
+  ['Codex CLI', 'harness', 'long-running tasks in the background', 0.14],
+  ['agent-browser', 'connector', 'letting the agent test its own UI', 0.12],
+  ['Gemini', 'chat', 'long documents and second opinions', 0.11],
+  ['tmux', 'multiplexer', 'one session per task, side by side', 0.19],
   ['Diffity', 'review', 'reading and commenting on every diff', 0.13],
-  ['cmux', 'other', 'many agents in parallel, with a ping when one needs you', 0.11],
-  ['T3 Code', 'assistant', 'one window over several coding agents', 0.08],
+  ['cmux', 'multiplexer', 'many agents in parallel, with a ping when one needs you', 0.11],
+  ['T3 Code', 'multiplexer', 'one window over several coding agents', 0.08],
   ['Windsurf', 'editor', 'edits with an agent in the editor', 0.05],
   ['an in-house deploy script', 'other', 'shipping after review', 0.04],
+  ['Ghostty', 'terminal', 'where the agents run', 0.21],
+  ['iTerm2', 'terminal', 'where the agents run', 0.17],
+  ['Terminal.app', 'terminal', 'where the agents run', 0.12],
 ];
 const purposeShare = [0.81, 0.64, 0.47, 0.41, 0.38, 0.35, 0.19, 0.14, 0.12];
 
@@ -79,6 +82,10 @@ for (let i = 0; i < count; i++) {
   const tools = toolPool.filter(([name, , , s]) => name === assistant || chance(s)).map(([name, kind, used_for]) => ({ name, kind, used_for }));
   const role = pickOne(ROLES.map((r) => r.id), [31, 14, 22, 3, 9, 4, 8, 7, 6, 3]);
   const heavy = role === 'product' || role === 'manager' || role === 'design' ? 0 : 1;
+  // What the tokens are: only the assistants that keep token records measure it.
+  const measured = heavy && chance(0.6);
+  const reread = 45 + Math.floor(rand() * 30);
+  const written = 8 + Math.floor(rand() * 12);
   const raw = {
     assistant,
     country: chance(0.93) ? pickOne(['us', 'de', 'gb', 'bg', 'in', 'fr', 'nl', 'pl', 'br', 'ca', 'es', 'au', 'jp', 'se', 'ua', 'za', 'sg', 'mx', 'ng', 'ar'], [22, 11, 10, 9, 8, 6, 5, 5, 4, 4, 3, 3, 3, 2, 2, 1, 1, 1, 1, 1]) : undefined,
@@ -94,6 +101,9 @@ for (let i = 0; i < count; i++) {
       prompts_per_task: chance(0.85) ? pickOne(TASK_PROMPT_RANGES.map((r) => r.id), [8, 30, 34, 20, 8]) : undefined,
       tokens_per_month: chance(0.6) ? pickOne(TOKEN_RANGES.map((r) => r.id), heavy ? (daysAgo > 180 ? [14, 30, 34, 18, 4] : [6, 18, 34, 30, 12]) : [30, 36, 24, 8, 2]) : undefined,
       lines_per_month: heavy && chance(0.7) ? pickOne(LINES_RANGES.map((r) => r.id), daysAgo > 180 ? [20, 34, 28, 12, 5, 1] : [8, 24, 32, 20, 12, 4]) : undefined,
+      context_per_request: measured ? pickOne(CONTEXT_RANGES.map((r) => r.id), daysAgo > 180 ? [10, 26, 34, 22, 7, 1] : [4, 14, 28, 34, 16, 4]) : undefined,
+      cost_split: measured ? { reread, loaded: 100 - reread - written, written } : undefined,
+      subagent_share: measured ? (chance(0.45 * grow) ? 5 + Math.floor(rand() * 40) : Math.floor(rand() * 4)) : undefined,
       cost_per_month: chance(0.65) ? pickOne(COST_RANGES.map((r) => r.id), daysAgo > 180 ? [22, 44, 18, 10, 5, 1] : [10, 34, 24, 18, 11, 3]) : undefined,
     },
     models: modelPool.filter(([, then, today]) => chance(today + (then - today) * (daysAgo / 360))).map(([id, , , versions]) => withVersion(id, versions, daysAgo)),

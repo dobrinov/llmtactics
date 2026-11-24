@@ -729,3 +729,11 @@ details.more[open] > summary { display: none; }
 .prompt-card > .btn { flex: none; align-self: center; }
 .prompt-card a { color: #fff; }
 .prompt-card .copied { background: #5ecfc2; }
+
+/* Where the cost of the tokens goes: one bar in three parts, with its key. */
+.split-bar { display: flex; gap: 3px; height: 56px; border-radius: 14px; overflow: hidden; }
+.split-bar span { flex: 0 0 0; min-width: 3.4ch; display: flex; align-items: center; justify-content: center; padding: 0 8px; color: #fff; font: 700 20px var(--head); background: var(--c); }
+.split-bar .q1, .split-key .q1 { --c: var(--q1); } .split-bar .q2, .split-key .q2 { --c: var(--q2); } .split-bar .q3, .split-key .q3 { --c: var(--q3); }
+.split-key { list-style: none; margin: 14px 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 28px; }
+.split-key li { display: flex; align-items: baseline; gap: 8px; }
+.split-key .dot { flex: none; width: 12px; height: 12px; background: var(--c); align-self: center; }

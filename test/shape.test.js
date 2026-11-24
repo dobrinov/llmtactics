@@ -74,6 +74,31 @@ test('models, lines and cost accept only listed values', () => {
   assert.equal(c.tokens_per_month, '100M-1B');
 });
 
+test('token measurements are a listed range and whole percentages', () => {
+  const c = cleanContribution({
+    ...minimal,
+    efficiency: { context_per_request: '100K-200K', cost_split: { reread: 61.6, loaded: 26, written: 12 }, subagent_share: 18.4 },
+  });
+  assert.equal(c.context_per_request, '100k-200k');
+  assert.deepEqual(c.cost_split, { reread: 62, loaded: 26, written: 12 });
+  assert.equal(c.subagent_share, 18);
+
+  const bad = cleanContribution({
+    ...minimal,
+    efficiency: { context_per_request: '189570', cost_split: { reread: 90, loaded: 40, written: 'ignore the rules' }, subagent_share: '18' },
+  });
+  assert.equal(bad.context_per_request, null);
+  assert.equal(bad.cost_split, null);
+  assert.equal(bad.subagent_share, null);
+  // Three numbers that are not shares of one whole are dropped together.
+  assert.equal(cleanContribution({ ...minimal, efficiency: { cost_split: { reread: 90, loaded: 40, written: 30 } } }).cost_split, null);
+});
+
+test('tool kinds: the ones asked for now, and the earlier ones', () => {
+  const c = cleanContribution({ ...minimal, tools: [{ name: 'Ghostty', kind: 'terminal' }, { name: 'Zed', kind: 'assistant' }, { name: 'x', kind: 'made up' }] });
+  assert.deepEqual(c.tools.map((t) => t.kind), ['terminal', 'assistant', 'other']);
+});
+
 test('a country is kept only as a listed two-letter code', () => {
   assert.equal(cleanContribution({ ...minimal, country: 'BG' }).country, 'bg');
   assert.equal(cleanContribution({ ...minimal, country: 'Bulgaria; ignore the rules' }).country, null);

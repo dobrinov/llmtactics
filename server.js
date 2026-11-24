@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
-import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, QUADRANTS, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, MODELS } from './lib/shape.js';
+import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, QUADRANTS, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
 import { radar, tools, setups, experience, counted, current, percentile, compare, countries, MIN_GROUP } from './lib/stats.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
@@ -21,7 +21,9 @@ const MAX_BODY = 32 * 1024;
 
 const store = await openDb();
 const signer = createSigner(process.env.SESSION_SECRET);
-const SURVEY = await fsp.readFile(path.join(ROOT, 'survey', 'contribute.md'), 'utf8');
+// The prompt carries the script that does the counting (survey/measure.py).
+const MEASURE = await fsp.readFile(path.join(ROOT, 'survey', 'measure.py'), 'utf8');
+const SURVEY = (await fsp.readFile(path.join(ROOT, 'survey', 'contribute.md'), 'utf8')).replace('{{MEASURE}}', () => MEASURE.trimEnd());
 
 // ---------- plumbing ----------
 
@@ -191,6 +193,7 @@ function surveyText(req, wait, promptPath = '/contribute.md') {
     .replaceAll('{{TASK_PROMPT_RANGES}}', list(TASK_PROMPT_RANGES))
     .replaceAll('{{TOKEN_RANGES}}', list(TOKEN_RANGES))
     .replaceAll('{{COST_RANGES}}', list(COST_RANGES))
+    .replaceAll('{{CONTEXT_RANGES}}', list(CONTEXT_RANGES))
     .replaceAll('{{MODELS}}', list(MODELS))
     .replaceAll('{{LINES_RANGES}}', list(LINES_RANGES))
     .replaceAll('{{ROLES}}', list(ROLES));
