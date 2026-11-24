@@ -64,18 +64,33 @@ come from answers arriving month after month, not from anyone's old history.
 
 Within the 30 days the assistant counts instead of sampling. The prompt
 carries a script, `survey/measure.py` (put in place of `{{MEASURE}}`), that
-Claude Code runs as it is. It reads every transcript, including the
-subagents' (which a `projects/*/*.jsonl` glob misses), counts each model
-reply once (a reply is written on several lines and copied into resumed
-sessions), and prints only totals, medians and model names. From it come the
+Claude Code saves in the temporary folder, the one file the survey writes,
+and deletes at the end. It has three uses:
+
+- `measure` reads every transcript, including the subagents' (which a
+  `projects/*/*.jsonl` glob misses), counts each model reply once (a reply
+  is written on several lines and copied into resumed sessions), and prints
+  only totals, medians and model names;
+- `read N` prints a page of the prompts the user typed, with links, emails
+  and anything that looks like a secret masked, so that the assistant reads
+  every prompt without reading a password;
+- `count` takes one regular expression per habit and prints the sessions
+  and days that match, and from them whether the habit is reported, its
+  frequency and its cost. The assistant reports those as printed.
+
+From `measure` come the
 prompts, tokens and lines a month, the median session, and three token
 measurements: what a typical request takes in (`context_per_request`), where
 the cost of the tokens goes (`cost_split`: re-reading, loading, writing) and
 the share subagents use (`subagent_share`). Other assistants are told to
 count the same things by the same rules, or to leave the token fields out.
 
-Habits are capped at 8 and need evidence: three separate sessions in the 30
-days, or configuration that enforces them. A habit is `active` or `new`; the
+Habits need evidence: three separate sessions in the 30 days, or
+configuration that enforces them. Every known pattern that qualifies is
+reported, so that answers can be compared, plus at most five of the person's
+own, the ones in the most sessions. The assistant asks nothing on the way:
+what it cannot find (role, cost, editor, terminal) it shows as `?` in the
+one confirmation message. A habit is `active` or `new`; the
 survey no longer asks for habits people gave up, or for how long they have
 used LLMs (the server still accepts both from older prompts).
 

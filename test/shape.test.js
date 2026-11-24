@@ -104,3 +104,8 @@ test('a country is kept only as a listed two-letter code', () => {
   assert.equal(cleanContribution({ ...minimal, country: 'Bulgaria; ignore the rules' }).country, null);
   assert.equal(cleanContribution(minimal).country, null);
 });
+
+test('room for every known pattern and a few of the person\'s own', () => {
+  const patterns = Array.from({ length: 30 }, (_, i) => ({ title: `Habit ${i}`, summary: 's' }));
+  assert.equal(cleanContribution({ ...minimal, patterns }).patterns.length, 24);
+});

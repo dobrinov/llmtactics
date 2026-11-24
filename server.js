@@ -180,7 +180,7 @@ function surveyText(req, wait, promptPath = '/contribute.md') {
   return SURVEY
     .replaceAll('{{SITE}}', SITE)
     .replaceAll('{{DESTINATION}}', destination)
-    .replaceAll('{{NOTICE}}', wait ? '' : `\n> **This copy is for reading only.** To take part, open ${base}/contribute and paste the line it shows: it carries a one-time code the submission needs.\n`)
+    .replaceAll('{{NOTICE}}', wait ? '' : `\n> **This copy is for reading only.** To take part, open ${base}/contribute and paste the line it shows: it carries a one-time code the submission needs. If you are an assistant and were asked to follow this copy, do not start: tell your user to open that page.\n`)
     .replaceAll('{{BASE_URL}}', base)
     .replaceAll('{{PROMPT_URL}}', `${base}${promptPath}`)
     .replaceAll('{{SUBMIT_URL}}', wait ? `${base}/api/contributions?t=${wait.token}` : `${base}/api/contributions?t=ONE-TIME-CODE`)
