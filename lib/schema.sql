@@ -121,3 +121,7 @@ CREATE TABLE IF NOT EXISTS waits (
 -- so the prompt can be fetched from /u/<id>/contribute.md before the page exists.
 ALTER TABLE waits ADD COLUMN IF NOT EXISTS reserved_id text;
 CREATE INDEX IF NOT EXISTS waits_reserved ON waits(reserved_id);
+
+-- When an assistant first fetched the prompt, so the contribute page can show
+-- that it is at work.
+ALTER TABLE waits ADD COLUMN IF NOT EXISTS fetched_at timestamptz;

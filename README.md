@@ -23,10 +23,11 @@ npm test                  # needs the llmpatterns_test database
 | --- | --- |
 | `/` | The tour, seven slides: intro, habits (the radar), setups, models over time, coding agents over time, where answers came from, and taking part |
 | `/tools`, `/tools/<tool>` | Every tool people named, by kind, and one tool's page: its share, six months of it, and what people use it with. Opened from the Setups slide |
-| `/contribute` | One line to paste, with an optional name and password for the page it creates. `?for=company` creates a company page instead |
+| `/contribute` | Just me: one line to paste, then a step at a time as the assistant fetches the prompt and its answer arrives. `?for=company` starts a company page: name it, invite colleagues, reach 5 people |
 | `/u/<id>` | The tour through one person's lens: their habits, setup and models among everyone's. `/u/<id>/tools` likewise |
-| `/c/<id>` | The tour through a company's lens, next to everyone. Until 5 people have answered: how many have, and the link to send. `/c/<id>/tools` likewise |
-| `/c/<id>/contribute` | The company's contribute page, to send to colleagues |
+| `/c/<id>` | The tour through a company's lens, next to everyone. Until 5 people's answers have been reviewed: how many have answered. `/c/<id>/tools` likewise |
+| `/c/<id>/contribute` | The page to send to colleagues: the Just me steps, with the answer counting for the company too |
+| `/c/<id>/invite` | For the person who started the page: the link for colleagues and their own line; once 5 have answered, that the results are open |
 | `/admin` | Contributions, review, and how to run the analysis |
 | `/u/<id>/contribute.md`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). `/contribute.md` is a copy for reading |
 
@@ -42,12 +43,14 @@ it, but the password only opens the page.
 1. A contribute page shows one line to paste:
    - for yourself, `Fetch <base>/u/<id>/contribute.md and follow the instructions in it.`
      The `<id>` is the address your results page will get.
-   - for a company, `Fetch <base>/c/<id>/contribute.md and follow the instructions in it.`
+     A company's contribute page shows the same kind of line, with the company
+     on the one-time code. (`<base>/c/<id>/contribute.md` still works: each
+     fetch gets its own code.)
 2. The prompt served at that address carries a one-time code (table `waits`)
    in its submit URL, `/api/contributions?t=<code>`. The code works once and
-   expires after two days. A personal contribute page waits for the answer
-   and then opens the results; after a company prompt, the assistant opens or
-   hands over the link to the person's own results page.
+   expires after two days. The contribute page follows the code: it moves to
+   "looking around" when the prompt is fetched (`waits.fetched_at`) and to the
+   results when the answer arrives, when the browser gets the new page.
 3. `lib/shape.js` keeps only known fields and listed values, caps lengths, and
    removes URLs, emails, paths and token-like strings. `lib/security.js` then
    screens the remaining free text for signs of prompt injection.
@@ -165,5 +168,6 @@ docker compose exec -T db pg_dump -U llmtactics llmtactics | gzip > backup-$(dat
 | `lib/analysis.js`, `scripts/analyse.js` | The analysis prompt, schema, checks and runner |
 | `lib/stats.js` | Radar shares, tools, models, setups, experience, cost |
 | `lib/tour.js` | The tour and the tool pages, under the Everyone, company and You lenses |
+| `lib/flow.js` | Taking part, one screen per step: Just me, and With my company |
 | `lib/views.js`, `lib/admin-views.js`, `lib/html.js`, `lib/radar.js` | Other pages, and the radar's placement |
 | `data/catalog.json`, `data/tools.json` | Known patterns and tools |

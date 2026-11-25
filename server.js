@@ -8,6 +8,7 @@ import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
 import { radar, tools, counted, countries, MIN_GROUP, NO_COUNTRY, exactSetups, stackedShares, familyNames, versionNames, harnessNames, setupKey, devTools, toolDetail } from './lib/stats.js';
 import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
+import * as flow from './lib/flow.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
@@ -204,9 +205,22 @@ function surveyText(req, wait, promptPath = '/contribute.md') {
 
 const accepted = () => store.contributions({ status: 'accepted' });
 
-// A company page that is still collecting answers shows only how many have arrived.
-async function companyData(req, company) {
-  return { company, base: baseUrl(req), radar: radar(await store.contributions({ companyId: company.id, status: 'accepted' })) };
+// A company's results open once MIN_GROUP people's answers have been reviewed.
+const companyOpen = async (company) => counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length >= MIN_GROUP;
+
+// This browser's own page, if it still exists.
+async function ownProfileId(req) {
+  const id = lastGrant(req, 'ou:');
+  return id && (await store.profile(id)) ? id : null;
+}
+
+// A one-time code for answering through a company. A browser that already has
+// a page answers onto it; anyone else gets a new page, reserved now.
+// `pageId` is the address in the line to paste.
+async function companyWait(req, company) {
+  const own = await ownProfileId(req);
+  const { token, reservedId } = await store.createWait({ companyId: company.id, profileId: own });
+  return { token, pageId: own ?? reservedId };
 }
 
 // A person's page before its first answer.
@@ -270,7 +284,7 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
   t.counts.countries = t.all.where.filter((c) => c.id !== NO_COUNTRY).length;
   if (company) {
     const mine = await store.contributions({ companyId: company.id, status: 'accepted' });
-    Object.assign(t, { group: lensNumbers(mine), groupName: groupName(company), home: `/c/${company.id}`, again: `/c/${company.id}/contribute` });
+    Object.assign(t, { group: lensNumbers(mine), groupName: groupName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
     t.rows.group = mine;
     if (acc?.owner) t.owner = { kind: 'c', edit: `/c/${company.id}/edit` };
   }
@@ -298,6 +312,9 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
     }
   }
   t.lenses = await lensesFor(req, { profile, company, who: t.who });
+  // A browser with a page of its own runs the survey again onto it.
+  const own = profile ? null : t.lenses.find((l) => l.id === 'you');
+  if (own) t.again = `${own.href}/contribute`;
   return t;
 }
 
@@ -323,15 +340,17 @@ setInterval(() => store.pruneWaits().catch(() => {}), 3600_000).unref();
 
 // Where a finished wait leads. The first browser that asks gets the owner grant
 // for the new page; anyone else is sent to the page itself (which may ask for its password).
+// `fetched`: the assistant has fetched the prompt and is at work. `code`: the
+// new page's editor's code, for the browser that is given the page.
 async function resolveWait(req, w) {
-  if (!w.contribution_id) return { status: 'waiting' };
+  if (!w.contribution_id) return { status: w.fetched_at ? 'fetched' : 'waiting' };
   const to = `/u/${w.profile_id}${w.company_id ? `?vs=${w.company_id}` : ''}`;
   if (grantsOf(req).includes(`ou:${w.profile_id}`)) return { status: 'done', redirect: to };
   if (await store.claimWait(w.token)) {
     // A new page gets its editor's code now, for the browser that owns it.
     const profile = await store.profile(w.profile_id);
     const issued = profile && !profile.editor_code_hash ? await issueCode('u', profile.id) : null;
-    return { status: 'done', redirect: to, grant: [`ou:${w.profile_id}`, ...(issued ? [issued.entry] : [])] };
+    return { status: 'done', redirect: to, code: issued?.code, grant: [`ou:${w.profile_id}`, ...(issued ? [issued.entry] : [])] };
   }
   return { status: 'done', redirect: to };
 }
@@ -391,7 +410,7 @@ async function handle(req, res) {
     const w = await store.liveWait(waitApi[1]);
     if (!w) return json(res, 404, { status: 'expired' });
     const r = await resolveWait(req, w);
-    return json(res, 200, { status: r.status, redirect: r.redirect }, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
+    return json(res, 200, { status: r.status, redirect: r.redirect, page: r.redirect?.split('?')[0], code: r.code }, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
   }
 
   if (req.method === 'POST') return post(req, res, url, p, m);
@@ -412,7 +431,11 @@ async function handle(req, res) {
     return md(surveyText(req, w && !w.contribution_id ? w : null));
   }
   const personalMd = m(/^\/u\/([a-z0-9]{10})\/contribute\.md$/);
-  if (personalMd) return md(surveyText(req, await store.openWaitFor(personalMd[1]), p));
+  if (personalMd) {
+    const w = await store.openWaitFor(personalMd[1]);
+    if (w) await store.markFetched(w.token);
+    return md(surveyText(req, w, p));
+  }
   const companyMd = m(/^\/c\/([a-z0-9]{8})\/contribute\.md$/);
   if (companyMd) {
     const company = await store.company(companyMd[1]);
@@ -429,12 +452,12 @@ async function handle(req, res) {
   const toolsAt = m(/^\/tools(?:\/([a-z0-9-]{1,80}))?$/);
   if (toolsAt) return toolsRoute(res, await tourData(req, {}), toolsAt[1]);
   if (p === '/contribute') {
+    if (url.searchParams.get('for') === 'company') return privateHtml(res, flow.companyStartPage({ error: url.searchParams.get('error') }));
     if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
-    const mode = url.searchParams.get('for') === 'company' ? 'company' : 'me';
-    const wait = mode === 'me' ? await store.createWait() : null;
+    const { token, reservedId } = await store.createWait();
     // An invitation link names its sender, and nothing else about them.
-    const inviter = mode === 'me' ? await store.profileByInvite(url.searchParams.get('from')) : null;
-    return privateHtml(res, views.contributePage({ mode, base: baseUrl(req), token: wait?.token, promptId: wait?.reservedId, error: url.searchParams.get('error'), inviter: inviter ? { name: inviter.name } : null }));
+    const inviter = await store.profileByInvite(url.searchParams.get('from'));
+    return privateHtml(res, flow.joinMePage({ token, line: flow.promptLine(`${baseUrl(req)}/u/${reservedId}/contribute.md`), inviter: inviter ? { name: inviter.name } : null }));
   }
 
   // A person's page.
@@ -448,7 +471,7 @@ async function handle(req, res) {
     if (prof[2] === '/contribute') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
       const { token } = await store.createWait({ profileId: profile.id });
-      return privateHtml(res, views.contributePage({ mode: 'me', base: baseUrl(req), token, promptId: profile.id, profile }));
+      return privateHtml(res, flow.joinMePage({ token, line: flow.promptLine(`${baseUrl(req)}/u/${profile.id}/contribute.md`), profile }));
     }
     if (prof[2] === '/export.json') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
@@ -462,22 +485,31 @@ async function handle(req, res) {
     return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null, invite: acc.owner ? await inviteLink(req, profile.id) : null }));
   }
 
-  // A company's page and its contribute page.
-  const comp = m(/^\/c\/([a-z0-9]{8})(\/contribute|\/edit|\/tools(?:\/([a-z0-9-]{1,80}))?)?$/);
+  // A company's page, its contribute page (for colleagues) and its invite page (for the person who started it).
+  const comp = m(/^\/c\/([a-z0-9]{8})(\/contribute|\/invite|\/edit|\/tools(?:\/([a-z0-9-]{1,80}))?)?$/);
   if (comp) {
     const company = await store.company(comp[1]);
     if (!company) return html(res, views.notFoundPage(), 404);
     const acc = access(req, 'c', company);
     if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'c', id: company.id, error: url.searchParams.get('error') }));
     if (comp[2] === '/edit') return editPage(req, res, url, 'c', company, acc);
-    if (comp[2] === '/contribute') {
+    if (comp[2] === '/contribute' || comp[2] === '/invite') {
+      if (comp[2] === '/invite' && !acc.owner) return redirect(res, `/c/${company.id}/contribute`);
       if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
-      const total = counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length;
-      return privateHtml(res, views.companyContributePage({ company, base: baseUrl(req), total, created: url.searchParams.has('created') && acc.owner, code: acc.owner ? shownCode(req, 'c', company.id) : null }));
+      if (comp[2] === '/invite' && await companyOpen(company)) return privateHtml(res, flow.companyOpenPage({ company, own: await ownProfileId(req) }));
+      const wait = await companyWait(req, company);
+      const props = { company, token: wait.token, line: flow.promptLine(`${baseUrl(req)}/u/${wait.pageId}/contribute.md`) };
+      if (comp[2] === '/invite') return privateHtml(res, flow.companyInvitePage({ ...props, base: baseUrl(req), code: shownCode(req, 'c', company.id) }));
+      return privateHtml(res, flow.joinMePage(props));
     }
     // Before 5 people have answered, the page shows how many have; then the tour through its lens.
-    const counted5 = counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length >= MIN_GROUP;
-    if (!counted5) return comp[2] ? redirect(res, `/c/${company.id}`) : privateHtml(res, views.companyPage(await companyData(req, company)));
+    if (!(await companyOpen(company))) {
+      if (comp[2]) return redirect(res, `/c/${company.id}`);
+      const own = new Set(grantsOf(req).filter((g) => g.startsWith('ou:')).map((g) => g.slice(3)));
+      const seats = (await store.contributions({ companyId: company.id })).filter((c) => c.status !== 'rejected')
+        .map((c) => ({ status: c.status === 'accepted' ? 'accepted' : 'review', mine: own.has(c.profile_id) }));
+      return privateHtml(res, flow.companyProgressPage({ company, base: baseUrl(req), seats, owner: acc.owner }));
+    }
     const t = await tourData(req, { company, acc });
     return comp[2] ? toolsRoute(res, t, comp[3]) : privateHtml(res, tourPage(t));
   }
@@ -519,26 +551,13 @@ async function post(req, res, url, p, m) {
   if (!sameOrigin(req)) return send(res, 403, 'Forbidden', 'text/plain');
   if (limited(req, 'form', 30)) return send(res, 429, 'Too many requests', 'text/plain');
 
-  // The optional name and password typed on a contribute page while it waits.
-  const details = m(/^\/api\/wait\/([a-z0-9]{16})\/details$/);
-  if (details) {
-    const w = await store.liveWait(details[1]);
-    if (!w || w.contribution_id || w.profile_id) return json(res, 404, { ok: false });
-    const form = await readForm(req);
-    let passwordHash;
-    try { passwordHash = newPassword(form.password); } catch (e) { return json(res, 400, { ok: false, error: e.message }); }
-    await store.setWaitDetails(w.token, { name: cleanName(form.name, 60), passwordHash });
-    return json(res, 200, { ok: true });
-  }
-
   if (p === '/companies') {
     if (limited(req, 'company', 10, 3600_000)) return send(res, 429, 'Too many company pages from this address. Try again later.', 'text/plain');
+    // A password can be added later, on the page's edit page.
     const form = await readForm(req);
-    let passwordHash;
-    try { passwordHash = newPassword(form.password); } catch (e) { return redirect(res, `/contribute?for=company&error=${encodeURIComponent(e.message)}`); }
-    const company = await store.createCompany({ name: cleanName(form.name, 80), passwordHash });
+    const company = await store.createCompany({ name: cleanName(form.name, 80), passwordHash: null });
     const issued = await issueCode('c', company.id);
-    return redirect(res, `/c/${company.id}/contribute?created`, { 'Set-Cookie': grantCookie(req, [`oc:${company.id}`, issued.entry]) });
+    return redirect(res, `/c/${company.id}/invite`, { 'Set-Cookie': grantCookie(req, [`oc:${company.id}`, issued.entry]) });
   }
 
   // Unlocking a password-protected page.

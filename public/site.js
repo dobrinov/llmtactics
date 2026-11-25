@@ -21,28 +21,73 @@ document.addEventListener('submit', (e) => {
   if (msg && !window.confirm(msg)) e.preventDefault();
 });
 
-// Contribute pages: wait for the submission, then go to the results.
+// Contribute pages: follow the one-time code. "fetched": the assistant has the
+// prompt and is at work; "done": its answer arrived. On a step page
+// ([data-flow="me"]) these move the steps on; elsewhere a line of text says so.
+const flowPage = document.querySelector('[data-flow="me"]');
+let flowAt = 1;
+let flowReached = 1;
+function flowGo(n) {
+  if (!flowPage) return;
+  flowReached = Math.max(flowReached, n);
+  flowAt = n;
+  for (const s of flowPage.querySelectorAll('[data-flow-step]')) s.hidden = Number(s.dataset.flowStep) !== n;
+  for (const d of flowPage.querySelectorAll('[data-flow-dot]')) {
+    const i = Number(d.dataset.flowDot);
+    d.classList.toggle('on', i === n);
+    d.classList.toggle('done', i < n || (i <= flowReached && i !== n));
+    d.disabled = i > flowReached || flowReached === 4;
+    if (i === n) d.setAttribute('aria-current', 'step'); else d.removeAttribute('aria-current');
+  }
+  flowPage.querySelector(`[data-flow-step="${n}"] h1`)?.focus({ preventScroll: true });
+}
+if (flowPage) {
+  for (const el of flowPage.querySelectorAll('[data-js]')) el.hidden = false;
+  for (const h of flowPage.querySelectorAll('[data-flow-step] h1')) h.tabIndex = -1;
+  flowPage.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-flow-go], [data-flow-dot]');
+    if (b && !b.disabled) flowGo(Number(b.dataset.flowGo || b.dataset.flowDot));
+  });
+}
+
 const waitEl = document.querySelector('[data-wait]');
 if (waitEl) {
-  const text = waitEl.querySelector('[data-wait-text]');
+  const text = document.querySelector('[data-wait-text]');
+  const say = (msg) => { if (text) text.textContent = msg; };
   const started = Date.now();
+  function arrived(body) {
+    if (!flowPage) {
+      say('Your answer arrived. ');
+      const a = document.createElement('a');
+      a.href = body.redirect;
+      a.textContent = 'See your results';
+      text?.append(a);
+      return;
+    }
+    const results = flowPage.querySelector('[data-flow-results]');
+    if (results && body.redirect) results.href = `${body.redirect}#habits`;
+    const edit = flowPage.querySelector('[data-flow-edit]');
+    if (edit && body.page) { edit.href = `${body.page}/edit`; edit.hidden = false; }
+    if (body.code) {
+      flowPage.querySelector('[data-flow-code]').textContent = body.code;
+      flowPage.querySelector('[data-flow-keep]').hidden = false;
+    }
+    say('');
+    flowGo(4);
+  }
   async function check() {
     if (Date.now() - started > 45 * 60_000) {
-      text.textContent = 'Still waiting. Reload this page if your assistant sent it in another way.';
+      say('Still waiting. Reload this page if your assistant sent it in another way.');
       return;
     }
     if (document.visibilityState === 'visible') {
       try {
         const r = await fetch(`/api/wait/${waitEl.dataset.wait}`, { cache: 'no-store' });
         const body = await r.json();
-        if (body.status === 'done') {
-          waitEl.classList.add('done');
-          text.textContent = 'Your answer arrived. Opening your results…';
-          setTimeout(() => location.assign(body.redirect), 600);
-          return;
-        }
+        if (body.status === 'done') return arrived(body);
+        if (body.status === 'fetched' && flowAt < 2) flowGo(2);
         if (body.status === 'expired') {
-          text.textContent = 'This prompt has expired. Reload the page for a new one.';
+          say('This line has expired. Reload the page for a new one.');
           return;
         }
       } catch { /* try again on the next tick */ }
@@ -128,25 +173,6 @@ for (const box of document.querySelectorAll('[data-scroll-list]')) {
   list.addEventListener('scroll', update, { passive: true });
   addEventListener('resize', update);
   update();
-}
-
-// The optional name and password on a contribute page: saved with the one-time
-// code as you type, so they are there when the assistant's answer arrives.
-for (const form of document.querySelectorAll('[data-details-form]')) {
-  const status = form.querySelector('[data-details-status]');
-  let timer;
-  const save = async () => {
-    clearTimeout(timer);
-    const password = form.elements.password.value;
-    try {
-      const r = await fetch(form.action, { method: 'POST', body: new URLSearchParams(new FormData(form)), credentials: 'same-origin' });
-      const body = await r.json().catch(() => ({}));
-      status.textContent = r.ok ? (form.elements.name.value.trim() || password ? 'Saved for your page' : '') : body.error || 'Could not save';
-    } catch { status.textContent = 'Could not save'; }
-  };
-  form.addEventListener('submit', (e) => { e.preventDefault(); save(); });
-  form.addEventListener('input', () => { status.textContent = ''; clearTimeout(timer); timer = setTimeout(save, 700); });
-  form.addEventListener('change', save);
 }
 
 // The world map: a country's name and its number of people follow the pointer.
