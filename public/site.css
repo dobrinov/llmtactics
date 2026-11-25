@@ -737,3 +737,5 @@ details.more[open] > summary { display: none; }
 .split-key { list-style: none; margin: 14px 0 6px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 28px; }
 .split-key li { display: flex; align-items: baseline; gap: 8px; }
 .split-key .dot { flex: none; width: 12px; height: 12px; background: var(--c); align-self: center; }
+
+.tail { display: block; font-variant-numeric: tabular-nums; }

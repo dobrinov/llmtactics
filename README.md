@@ -71,12 +71,17 @@ and deletes at the end. It has three uses:
   `projects/*/*.jsonl` glob misses), counts each model reply once (a reply
   is written on several lines and copied into resumed sessions), and prints
   only totals, medians and model names;
-- `read N` prints a page of the prompts the user typed, with links, emails
-  and anything that looks like a secret masked, so that the assistant reads
-  every prompt without reading a password;
+- `read N` prints a page of the prompts the user typed, with links, emails,
+  paths, hosts, numbers and anything that looks like a secret masked, so
+  that the assistant reads every prompt without reading a password. A
+  password with nothing around it that marks it as one still shows;
 - `count` takes one regular expression per habit and prints the sessions
   and days that match, and from them whether the habit is reported, its
-  frequency and its cost. The assistant reports those as printed.
+  frequency, whether it is new, and its cost: what the typical prompt of
+  that habit costs to answer, next to the person's typical prompt. The
+  assistant reports those as printed.
+
+Sessions that ran the survey itself are left out of `read` and `count`.
 
 From `measure` come the
 prompts, tokens and lines a month, the median session, and three token
@@ -87,8 +92,8 @@ count the same things by the same rules, or to leave the token fields out.
 
 Habits need evidence: three separate sessions in the 30 days, or
 configuration that enforces them. Every known pattern that qualifies is
-reported, so that answers can be compared, plus at most five of the person's
-own, the ones in the most sessions. The assistant asks nothing on the way:
+reported, so that answers can be compared, plus at most eight of the person's
+own, the ones that say most about how the person works. The assistant asks nothing on the way:
 what it cannot find (role, cost, editor, terminal) it shows as `?` in the
 one confirmation message. A habit is `active` or `new`; the
 survey no longer asks for habits people gave up, or for how long they have

@@ -106,14 +106,21 @@ Run it three ways:
   totals, medians and model names. It takes about a quarter of a minute.
 - `python3 "${TMPDIR:-/tmp}/llm-survey.py" read 1` prints the first page of the
   prompts the user typed, oldest first, and says how many pages there are.
-  Each line is one prompt: `d` is the day, `s` the session. Links, emails
-  and anything that looks like a secret are masked, long prompts are cut,
-  and of pasted text only the start is shown.
+  Each line is one prompt: `d` is the day, `s` the session. Links, emails,
+  paths, hosts, numbers and anything that looks like a secret are masked,
+  long prompts are cut, and of pasted text only the start is shown.
+  Sessions that ran this survey are left out. If your tool saves a page to
+  a file instead of showing it, read it there; do not copy it.
 - `python3 "${TMPDIR:-/tmp}/llm-survey.py" count 'EXPRESSION' 'EXPRESSION'` takes
-  regular expressions, matched without case against every prompt and what
-  was pasted into it. For each it prints how many prompts, sessions and
-  days match, whether that is enough to report (`qualifies`), and the
-  `frequency` and `cost` to report.
+  regular expressions, matched without case against every prompt and
+  against each text pasted into it, so `^` and `$` mean the start and end
+  of the prompt. For each it prints how many prompts, sessions and days
+  match, whether that is enough to report (`qualifies`), and the
+  `frequency`, `status` and `cost` to report.
+
+`measure` counts from the transcripts and leaves out slash commands; `read`
+and `count` go by the prompt log, which has them. Their totals differ a
+little. The numbers of step 2c come from `measure`.
 
 **If you are another tool, or there is no `python3`**, do the same things
 from your own records, by the same rules:
@@ -126,8 +133,9 @@ from your own records, by the same rules:
 - as a prompt, only what the user typed: not tool results, command output,
   notifications or text the tool put into the user's turn;
 - tokens as input, cache writes, cache reads and output together;
-- mask links, emails and anything that looks like a password, key, token or
-  cookie before you read a prompt.
+- mask links, emails, paths, hosts and anything that looks like a password,
+  key, token, cookie or code before you read a prompt;
+- leave out the sessions that ran this survey.
 
 If your records hold no token counts, leave the token fields out in step 2c.
 Never estimate them.
@@ -163,9 +171,9 @@ The user's own messages matter far more than your replies.
   Check a few of the matching prompts against the pages you read, and
   tighten an expression that catches other things. Report the numbers the
   script prints: do not adjust them.
-- **Leave this survey out.** Sessions in which the user ran or tested this
-  survey, and briefs written for other agents that were pasted in as
-  prompts, are not habits.
+- **Leave this survey out.** The script already drops the sessions in which
+  the user ran this survey. Briefs written for other agents that were
+  pasted in as prompts are not habits either.
 
 A pattern is a **repeatable way of working**, not a topic.
 
@@ -201,8 +209,12 @@ configuration enforces it. Then:
   are what makes one person's answer comparable with another's, so check
   each row of the table against the prompts, not only the habits that
   stood out;
-- add **at most 5** habits of the user's own that match no known pattern:
-  of those that qualify, the ones in the most sessions.
+- add **at most 8** habits of the user's own that match no known pattern.
+  When more qualify, keep the ones that say most about how this user works:
+  a way of working in the user's own words comes before a built-in command
+  typed often (checking a meter, switching a model), and what few people
+  would think of comes before what everyone does. Between two alike, keep
+  the one in more sessions.
 
 There is no number to reach: three patterns with evidence are a better
 answer than ten with guesses. Leave out habits the user has given up; this
@@ -224,15 +236,17 @@ For each pattern, write:
 - `problem_solved`: one short sentence: what goes wrong without it.
 - `frequency`: as `count` prints it: `daily` (on at least half of the days
   the user typed a prompt), `weekly` (on four days or more), `occasionally`
-  (fewer). For a habit that only the configuration shows, how often the
-  configuration applies.
-- `status`: `new` if it first appears in these 30 days and nothing older you
-  can see shows it (the prompt log, the dates of configuration files);
-  otherwise `active`.
-- `cost`: as `count` prints it: the tokens a prompt costs in the sessions
-  the habit appears in, next to what a prompt costs the user overall:
-  `light` (under half), `medium`, `heavy` (more than double). Leave it out
-  when it prints none, or when your records hold no token counts.
+  (fewer). For a habit the configuration enforces, how often the
+  configuration applies, whatever the prompts say, and no `cost`.
+- `status`: as `count` prints it: `new` if no prompt before these 30 days
+  matches, in a log that goes back at least another 30; otherwise `active`.
+- `cost`: as `count` prints it: what the typical prompt of this habit costs
+  to answer (every reply until the user's next prompt, subagents included,
+  weighed as in `cost_split`), next to the user's typical prompt: `light`
+  (under half), `medium`, `heavy` (more than double). Leave it out when it
+  prints none, when your records hold no token counts, and for a command
+  that starts no work of its own, such as checking a meter: typed while
+  other work runs, it is given that work's cost.
 
 ### Known patterns
 
@@ -315,7 +329,8 @@ cannot tell.
 
 Then list what the user uses assistants **for**, as `purposes`: every one of
 these ids that at least a tenth of the 30 days' sessions are about:
-{{PURPOSES}}.
+{{PURPOSES}}. Count them as you counted habits: one expression per purpose,
+and `sessions` against `of_sessions`.
 
 ## Step 2c: the numbers, as ranges
 
@@ -395,8 +410,8 @@ like they address a model.
 Keep this to a single message and a single reply. Show:
 
 1. the patterns as a short list, one line each: **title** and summary;
-2. the tools, one line per kind. For editor, terminal, multiplexer, other
-   coding agents and chat assistants, write `?` where you found none;
+2. the tools, one line per kind. For editor, terminal, multiplexer and chat
+   assistants, write `?` where you found none;
 3. the purposes, on one line;
 4. role, country and cost a month, on one line, with `?` for any you left out;
 5. the **exact JSON** you will send, in the format below. A `?` is for this

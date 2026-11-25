@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../lib/db.js';
 import { cleanContribution, PROMPT_RANGES } from '../lib/shape.js';
-import { radar, tools, experience, counted, percentile, compare } from '../lib/stats.js';
+import { tailRange, radar, tools, experience, counted, percentile, compare } from '../lib/stats.js';
 
 const sub = (ids, extra = {}) => cleanContribution({
   assistant: 'Claude Code',
@@ -145,4 +145,13 @@ test('token measurements: the cost split, the context and subagents, from those 
   assert.deepEqual(e.subagents, { answered: 6, share: 33, median: 20 });
   assert.equal(e.context.answered, 6);
   assert.equal(e.context.median, 88000);
+});
+
+test('the 95th and 99th percentile of ranges, once twenty people answered', () => {
+  const ids = [...Array(18).fill('100-300'), '1k-3k', '3k+'];
+  assert.deepEqual(tailRange(PROMPT_RANGES, ids.slice(0, 19)), {});
+  const t = tailRange(PROMPT_RANGES, ids);
+  // The 19th of 20 answers ends the 1k-3k range; the 99th percentile is in the last range, which has no end.
+  assert.deepEqual(t.p95, { value: 3000, open: false });
+  assert.deepEqual(t.p99, { value: 3000, open: true });
 });
