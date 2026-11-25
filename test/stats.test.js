@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../lib/db.js';
 import { cleanContribution, PROMPT_RANGES } from '../lib/shape.js';
-import { tailRange, medianRange, radar, tools, experience, counted, percentile, compare } from '../lib/stats.js';
+import { tailRange, medianRange, radar, tools, experience, counted, percentile, compare, exactSetups, stackedShares, familyNames, toolDetail } from '../lib/stats.js';
 
 const sub = (ids, extra = {}) => cleanContribution({
   assistant: 'Claude Code',
@@ -158,4 +158,39 @@ test('the 95th percentile from twenty answers, the 99th from a hundred; the last
   assert.deepEqual(tailRange(PROMPT_RANGES, ['100-300', ...Array(19).fill('gone')]), { p95: null });
   // A median in the last range is that range's start, never above the percentiles.
   assert.equal(medianRange(PROMPT_RANGES, Array(20).fill('3k+')), 3000);
+});
+
+const withTools = (names, extra = {}) => sub(['clean-slate'], { tools: names.map((name) => ({ name, kind: 'other' })), ...extra });
+
+test('whole setups: each person in exactly one, so the shares add up to 100%', async () => {
+  await add(withTools(['Claude Code', 'tmux']));
+  await add(withTools(['tmux', 'Claude Code', 'ChatGPT'])); // chat assistants are not part of a setup
+  await add(withTools(['Cursor']));
+  await add(withTools(['ChatGPT'])); // no coding tools at all
+  const s = exactSetups(await store.contributions({ status: 'accepted' }));
+  assert.equal(s.total, 4);
+  assert.equal(s.none, 1);
+  assert.deepEqual(s.setups.map((x) => [x.key, x.count]), [['claude code|tmux', 2], ['cursor', 1]]);
+  assert.equal(Math.round(s.setups.reduce((a, x) => a + x.share, 0) + (100 * s.none) / s.total), 100);
+});
+
+test('stacked shares: every month adds up to 100%, each person split over what they named', async () => {
+  await add(sub(['clean-slate'], { models: ['claude-opus@4.5', 'gpt'] }));
+  await add(sub(['clean-slate'], { models: ['claude-opus'] }));
+  await add(sub(['clean-slate'], { models: [] }));
+  const s = stackedShares(await store.contributions({ status: 'accepted' }), familyNames);
+  const now = s.months.at(-1);
+  assert.equal(now.n, 2); // the answer that named no model is left out
+  assert.deepEqual(s.names, ['Claude Opus', 'GPT']);
+  assert.deepEqual(now.parts.map(Math.round), [75, 25]);
+});
+
+test('a tool: its share, and the tools its users work with', async () => {
+  await add(withTools(['tmux', 'Claude Code']));
+  await add(withTools(['tmux', 'Cursor']));
+  await add(withTools(['Cursor']));
+  const d = toolDetail(await store.contributions({ status: 'accepted' }), 'TMUX');
+  assert.equal(d.share, 67);
+  assert.deepEqual(d.with.map((w) => [w.name, w.share]), [['Claude Code', 50], ['Cursor', 50]]);
+  assert.equal(d.series.at(-1).share, 67);
 });

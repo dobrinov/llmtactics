@@ -21,10 +21,11 @@ npm test                  # needs the llmpatterns_test database
 
 | URL | What |
 | --- | --- |
-| `/` | The presentation: introduction, radar, habits, tools, development environments, tools over time, models over time, prompts and lines of code over time, cost over time (dollars and tokens), where the tokens go, purposes, time per task, costly habits, roles, emerging habits, and the invitation to take part |
+| `/` | The tour, seven slides: intro, habits (the radar), setups, models over time, coding agents over time, where answers came from, and taking part |
+| `/tools`, `/tools/<tool>` | Every tool people named, by kind, and one tool's page: its share, six months of it, and what people use it with. Opened from the Setups slide |
 | `/contribute` | One line to paste, with an optional name and password for the page it creates. `?for=company` creates a company page instead |
-| `/u/<id>` | One person's results. First slide: their name, if they gave one. Last slide: run again, or start a company page |
-| `/c/<id>` | A company's results. First slide: its name, if it has one. Last slide: asks colleagues to contribute. Results appear at 5 counted people |
+| `/u/<id>` | The tour through one person's lens: their habits, setup and models among everyone's. `/u/<id>/tools` likewise |
+| `/c/<id>` | The tour through a company's lens, next to everyone. Until 5 people have answered: how many have, and the link to send. `/c/<id>/tools` likewise |
 | `/c/<id>/contribute` | The company's contribute page, to send to colleagues |
 | `/admin` | Contributions, review, and how to run the analysis |
 | `/u/<id>/contribute.md`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). `/contribute.md` is a copy for reading |
@@ -163,5 +164,6 @@ docker compose exec -T db pg_dump -U llmtactics llmtactics | gzip > backup-$(dat
 | `lib/security.js` | Password hashing, signed cookies, the injection screen |
 | `lib/analysis.js`, `scripts/analyse.js` | The analysis prompt, schema, checks and runner |
 | `lib/stats.js` | Radar shares, tools, models, setups, experience, cost |
-| `lib/views.js`, `lib/admin-views.js`, `lib/html.js`, `lib/radar.js` | Pages and charts |
+| `lib/tour.js` | The tour and the tool pages, under the Everyone, company and You lenses |
+| `lib/views.js`, `lib/admin-views.js`, `lib/html.js`, `lib/radar.js` | Other pages, and the radar's placement |
 | `data/catalog.json`, `data/tools.json` | Known patterns and tools |

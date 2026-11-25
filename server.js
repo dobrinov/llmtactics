@@ -5,8 +5,9 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
-import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, QUADRANTS, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
-import { radar, tools, setups, experience, counted, current, percentile, compare, countries, MIN_GROUP } from './lib/stats.js';
+import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
+import { radar, tools, counted, countries, MIN_GROUP, NO_COUNTRY, exactSetups, stackedShares, familyNames, versionNames, harnessNames, setupKey, devTools, toolDetail } from './lib/stats.js';
+import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
@@ -89,7 +90,7 @@ function sameOrigin(req) {
   try { return new URL(origin).host === new URL(baseUrl(req)).host; } catch { return false; }
 }
 
-const TYPES = { '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
+const TYPES = { '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp' };
 async function serveStatic(res, rel) {
   const dir = path.join(ROOT, 'public');
   const file = path.resolve(dir, rel);
@@ -203,67 +204,14 @@ function surveyText(req, wait, promptPath = '/contribute.md') {
 
 const accepted = () => store.contributions({ status: 'accepted' });
 
-function weeksOf(contribs, since) {
-  const monday = (d) => { const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())); x.setUTCDate(x.getUTCDate() - ((x.getUTCDay() + 6) % 7)); return x; };
-  const first = Math.min(Date.parse(since), ...contribs.map((c) => Date.parse(c.created_at)));
-  const start = monday(new Date(first));
-  const weeks = [];
-  for (let w = monday(new Date()); (w >= start || weeks.length < 8) && weeks.length < 12; w = new Date(w.getTime() - 7 * 864e5)) weeks.unshift(w);
-  return weeks.map((w) => {
-    const end = w.getTime() + 7 * 864e5;
-    return {
-      label: w.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
-      count: contribs.filter((c) => { const t = Date.parse(c.created_at); return t >= w.getTime() && t < end; }).length,
-    };
-  });
+// A company page that is still collecting answers shows only how many have arrived.
+async function companyData(req, company) {
+  return { company, base: baseUrl(req), radar: radar(await store.contributions({ companyId: company.id, status: 'accepted' })) };
 }
 
-function toolShareMap(rows) {
-  const map = new Map();
-  for (const c of rows) for (const key of new Set(c.tools.map((t) => t.name.toLowerCase()))) map.set(key, (map.get(key) || 0) + 1);
-  return (name) => (rows.length ? Math.round((100 * (map.get(name.toLowerCase()) || 0)) / rows.length) : 0);
-}
-
-async function companyData(req, company, acc) {
-  const [all, mine] = await Promise.all([accepted(), store.contributions({ companyId: company.id, status: 'accepted' })]);
-  const here = radar(mine);
-  const everywhere = radar(all);
-  const allShare = toolShareMap(current(all));
-  const expHere = experience(mine);
-  const expAll = experience(all);
-  return {
-    company,
-    base: baseUrl(req),
-    radar: here,
-    compared: compare(here, everywhere),
-    tools: tools(mine, { top: 7 }).tools.map((t) => ({ name: t.name, here: t.share, everywhere: allShare(t.name) })),
-    exp: { here: expHere.prompts, everywhere: expAll.prompts, minutesHere: expHere.efficiency.minutes, minutesEverywhere: expAll.efficiency.minutes, monthsHere: expHere.months, monthsEverywhere: expAll.months },
-    weeks: weeksOf(mine, new Date(company.created_at).toISOString()),
-    isOwner: acc.owner,
-  };
-}
-
-async function profileData(req, profile, url, acc) {
-  const [history, all, companies] = await Promise.all([store.contributions({ profileId: profile.id }), accepted(), store.companiesOf(profile.id)]);
-  const latest = history.at(-1) ?? null;
-  const radarAll = radar(all);
-  const base = { profile, latest, history, radarAll, companies, isOwner: acc.owner, base: baseUrl(req) };
-  if (!latest) return base;
-  const vs = companies.find((c) => c.id === url.searchParams.get('vs'));
-  let compareWith = null;
-  if (vs) {
-    const r = radar(await store.contributions({ companyId: vs.id, status: 'accepted' }));
-    compareWith = { company: vs, radar: r, enough: r.total >= MIN_GROUP };
-  }
-  const rows = current(all);
-  const share = toolShareMap(rows);
-  return {
-    ...base, compareWith,
-    toolShares: latest.tools.map((t) => ({ name: t.name, used_for: t.used_for, share: share(t.name) })),
-    promptPercentile: latest.prompts_per_month ? percentile(rows, PROMPT_RANGES, 'prompts_per_month', latest.prompts_per_month) : null,
-    promptBins: experience(all).prompts.bins,
-    unique: latest.patterns.filter((p) => !p.catalog_id && (radarAll.unmatchedTitles.get(p.title.toLowerCase())?.count ?? 0) <= 1),
-  };
+// A person's page before its first answer.
+async function profileData(req, profile, acc) {
+  return { profile, companies: await store.companiesOf(profile.id), isOwner: acc.owner };
 }
 
 // The page where a page is renamed, protected or deleted. Without the owner
@@ -276,6 +224,98 @@ async function editPage(req, res, url, kind, row, acc) {
     kind, row, code: shownCode(req, kind, row.id), saved: url.searchParams.has('saved'),
     error: error && error !== 'wrong' ? error.slice(0, 200) : null,
     invite: kind === 'u' ? await inviteLink(req, row.id) : null,
+  }));
+}
+
+// ---------- the tour ----------
+
+// Everything one lens shows, from one set of contributions.
+function lensNumbers(contribs) {
+  return {
+    radar: radar(contribs),
+    setups: exactSetups(contribs),
+    tools: tools(contribs).tools,
+    families: stackedShares(contribs, familyNames),
+    versions: stackedShares(contribs, versionNames, { top: 7 }),
+    harnesses: stackedShares(contribs, harnessNames),
+    where: countries(contribs),
+  };
+}
+
+const groupName = (company) => company.name || 'This company';
+const lastGrant = (req, prefix) => grantsOf(req).filter((g) => g.startsWith(prefix)).map((g) => g.slice(prefix.length)).at(-1);
+
+// The lenses this browser can switch between. Everyone, always; "You" once
+// this browser owns a page of its own (the signed cookie remembers it); a
+// company once that page has answered through a company, or the browser
+// started a company page. The page being looked at is always one of them.
+async function lensesFor(req, { profile = null, company = null, who = null }) {
+  const ownId = lastGrant(req, 'ou:');
+  const you = profile ?? (ownId ? await store.profile(ownId) : null);
+  let co = company ?? (you ? (await store.companiesOf(you.id))[0] : null) ?? null;
+  if (!co) { const id = lastGrant(req, 'oc:'); co = id ? await store.company(id) : null; }
+  return [
+    { id: 'everyone', label: 'Everyone', href: '/' },
+    ...(co ? [{ id: 'company', label: groupName(co), href: `/c/${co.id}` }] : []),
+    ...(you ? [{ id: 'you', label: profile && who ? who.lens : 'You', href: `/u/${you.id}` }] : []),
+  ];
+}
+
+// The data for the tour and the tool pages under one lens. For a person, null
+// when their page has no answer yet.
+async function tourData(req, { profile = null, company = null, acc = null }) {
+  const lens = profile ? 'you' : company ? 'company' : 'everyone';
+  const all = await accepted();
+  const t = { lens, home: '/', all: lensNumbers(all), counts: await store.counts(), group: null, me: null, owner: null, profile, rows: { all } };
+  t.counts.countries = t.all.where.filter((c) => c.id !== NO_COUNTRY).length;
+  if (company) {
+    const mine = await store.contributions({ companyId: company.id, status: 'accepted' });
+    Object.assign(t, { group: lensNumbers(mine), groupName: groupName(company), home: `/c/${company.id}`, again: `/c/${company.id}/contribute` });
+    t.rows.group = mine;
+    if (acc?.owner) t.owner = { kind: 'c', edit: `/c/${company.id}/edit` };
+  }
+  if (profile) {
+    const history = await store.contributions({ profileId: profile.id });
+    const latest = history.at(-1);
+    if (!latest) return null;
+    t.who = whoFor(profile, acc?.owner);
+    t.home = `/u/${profile.id}`;
+    t.me = {
+      patterns: new Set(latest.patterns.map((p) => p.catalog_id).filter(Boolean)),
+      setupKey: setupKey(latest),
+      setupSize: devTools(latest).size,
+      setupTools: [...devTools(latest).values()],
+      tools: new Set(latest.tools.map((x) => x.name.toLowerCase())),
+      families: new Set(familyNames(latest)),
+      versions: new Set(versionNames(latest)),
+      harnesses: new Set(harnessNames(latest)),
+      months: new Set(history.map((c) => c.created_at.slice(0, 7))),
+      country: latest.country,
+    };
+    if (acc?.owner) {
+      t.again = `/u/${profile.id}/contribute`;
+      t.owner = { kind: 'u', edit: `/u/${profile.id}/edit`, code: shownCode(req, 'u', profile.id), invite: await inviteLink(req, profile.id), review: views.REVIEW_NOTE[latest.status] ?? null };
+    }
+  }
+  t.lenses = await lensesFor(req, { profile, company, who: t.who });
+  return t;
+}
+
+// /tools and /tools/<slug> under a lens (`at` is '' or '/u/<id>' or '/c/<id>').
+function toolsRoute(res, t, slug) {
+  t.suffix = slug ? `/tools/${slug}` : '/tools';
+  const send = privateHtml;
+  if (!slug) return send(res, toolsIndexPage(t));
+  const at = t.all.tools.findIndex((x) => toolSlug(x.name) === slug);
+  if (at < 0) return html(res, views.notFoundPage(), 404);
+  const tool = t.all.tools[at];
+  const list = t.all.tools;
+  return send(res, toolPage(t, {
+    tool,
+    detail: toolDetail(t.rows.all, tool.name),
+    groupDetail: t.rows.group ? toolDetail(t.rows.group, tool.name) : null,
+    prev: list.length > 1 ? list[(at - 1 + list.length) % list.length] : null,
+    next: list.length > 1 ? list[(at + 1) % list.length] : null,
   }));
 }
 
@@ -384,14 +424,10 @@ async function handle(req, res) {
   }
 
   // The whole presentation: introduction, everyone's numbers, the invitation.
-  if (p === '/') {
-    const all = await accepted();
-    const area = QUADRANTS.some((q) => q.id === url.searchParams.get('area')) ? url.searchParams.get('area') : '';
-    return html(res, views.homePage({
-      counts: await store.counts(), radar: radar(all), tools: tools(all), setups: setups(all), exp: experience(all),
-      area, selectedId: url.searchParams.get('p'), where: countries(all),
-    }));
-  }
+  // The tour and the tool pages depend on this browser's cookie (its lenses), so they are never cached.
+  if (p === '/') return privateHtml(res, tourPage(await tourData(req, {})));
+  const toolsAt = m(/^\/tools(?:\/([a-z0-9-]{1,80}))?$/);
+  if (toolsAt) return toolsRoute(res, await tourData(req, {}), toolsAt[1]);
   if (p === '/contribute') {
     if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
     const mode = url.searchParams.get('for') === 'company' ? 'company' : 'me';
@@ -402,7 +438,7 @@ async function handle(req, res) {
   }
 
   // A person's page.
-  const prof = m(/^\/u\/([a-z0-9]{10})(\/contribute|\/export\.json|\/edit)?$/);
+  const prof = m(/^\/u\/([a-z0-9]{10})(\/contribute|\/export\.json|\/edit|\/tools(?:\/([a-z0-9-]{1,80}))?)?$/);
   if (prof) {
     const profile = await store.profile(prof[1]);
     if (!profile) return html(res, views.notFoundPage(), 404);
@@ -419,23 +455,31 @@ async function handle(req, res) {
       const contributions = (await store.contributions({ profileId: profile.id })).map(({ payload, ...c }) => c);
       return json(res, 200, { page: `/u/${profile.id}`, name: profile.name, created_at: profile.created_at, contributions }, { 'Content-Disposition': `attachment; filename="${SITE}-${profile.id}.json"` });
     }
-    return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, url, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null, invite: acc.owner ? await inviteLink(req, profile.id) : null }));
+    const t = await tourData(req, { profile, acc });
+    if (prof[2]?.startsWith('/tools')) return t ? toolsRoute(res, t, prof[3]) : redirect(res, `/u/${profile.id}`);
+    // A page with an answer is the tour through its lens; one without, an invitation to answer.
+    if (t) return privateHtml(res, tourPage(t));
+    return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null, invite: acc.owner ? await inviteLink(req, profile.id) : null }));
   }
 
   // A company's page and its contribute page.
-  const comp = m(/^\/c\/([a-z0-9]{8})(\/contribute|\/edit)?$/);
+  const comp = m(/^\/c\/([a-z0-9]{8})(\/contribute|\/edit|\/tools(?:\/([a-z0-9-]{1,80}))?)?$/);
   if (comp) {
     const company = await store.company(comp[1]);
     if (!company) return html(res, views.notFoundPage(), 404);
     const acc = access(req, 'c', company);
     if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'c', id: company.id, error: url.searchParams.get('error') }));
     if (comp[2] === '/edit') return editPage(req, res, url, 'c', company, acc);
-    if (comp[2]) {
+    if (comp[2] === '/contribute') {
       if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
       const total = counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length;
       return privateHtml(res, views.companyContributePage({ company, base: baseUrl(req), total, created: url.searchParams.has('created') && acc.owner, code: acc.owner ? shownCode(req, 'c', company.id) : null }));
     }
-    return privateHtml(res, views.companyPage(await companyData(req, company, acc)));
+    // Before 5 people have answered, the page shows how many have; then the tour through its lens.
+    const counted5 = counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length >= MIN_GROUP;
+    if (!counted5) return comp[2] ? redirect(res, `/c/${company.id}`) : privateHtml(res, views.companyPage(await companyData(req, company)));
+    const t = await tourData(req, { company, acc });
+    return comp[2] ? toolsRoute(res, t, comp[3]) : privateHtml(res, tourPage(t));
   }
 
   // The link an assistant opens after submitting.

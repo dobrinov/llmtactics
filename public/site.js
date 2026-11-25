@@ -21,111 +21,6 @@ document.addEventListener('submit', (e) => {
   if (msg && !window.confirm(msg)) e.preventDefault();
 });
 
-// The radar page: a dot or a list row opens that pattern in the drawer
-// without a reload; Esc, the close button or the backdrop close it.
-const root = document.querySelector('[data-radar]');
-const dataEl = document.getElementById('radar-data');
-if (root && dataEl) {
-  const data = JSON.parse(dataEl.textContent);
-  const order = root.dataset.order.split(' ');
-  const drawer = root.querySelector('[data-drawer]');
-  const scrim = root.querySelector('.scrim');
-  const panel = drawer.querySelector('[data-detail]');
-  const field = (name) => panel.querySelector(`[data-f="${name}"]`);
-  let current = new URL(location.href).searchParams.get('p');
-  let opener = null;
-
-  const urlFor = (id) => {
-    const url = new URL(location.href);
-    if (id) url.searchParams.set('p', id);
-    else url.searchParams.delete('p');
-    return url;
-  };
-
-  function mark(id) {
-    for (const b of root.querySelectorAll('.blip[data-id]')) {
-      b.classList.toggle('on', b.dataset.id === id);
-      b.setAttribute('aria-pressed', String(b.dataset.id === id));
-    }
-    for (const a of root.querySelectorAll('.pattern-list a')) {
-      if (a.dataset.id === id) a.setAttribute('aria-current', 'true');
-      else a.removeAttribute('aria-current');
-    }
-  }
-
-  function open(id) {
-    const d = data[id];
-    if (!d) return;
-    current = id;
-    panel.className = `detail q${d.q}`;
-    field('area').className = `badge q${d.q}`;
-    for (const k of ['area', 'status', 'title', 'summary', 'when', 'problem']) field(k).textContent = d[k];
-    field('n').textContent = `${d.n}.`;
-    field('share').textContent = `${d.share}%`;
-    field('from').textContent = d.trend[0].label;
-    field('to').textContent = d.trend.at(-1).label;
-    const top = Math.max(1, ...d.trend.map((t) => t.share));
-    const bars = field('trend');
-    bars.replaceChildren(...d.trend.map((t, i) => {
-      const bar = document.createElement('i');
-      bar.style.height = `${Math.max(3, (t.share / top) * 100).toFixed(0)}%`;
-      if (i === d.trend.length - 1) bar.className = 'last';
-      return bar;
-    }));
-    bars.setAttribute('aria-label', `Share per month: ${d.trend.map((t) => `${t.label} ${t.share}%`).join(', ')}`);
-    const at = order.indexOf(id);
-    for (const a of drawer.querySelectorAll('[data-step]')) {
-      a.href = urlFor(order[(at + Number(a.dataset.step) + order.length) % order.length]).search;
-    }
-    mark(id);
-    drawer.hidden = false;
-    scrim.hidden = false;
-    history.replaceState(null, '', urlFor(id));
-    const title = drawer.querySelector('h2');
-    title.tabIndex = -1;
-    title.focus();
-  }
-
-  function close() {
-    drawer.hidden = true;
-    scrim.hidden = true;
-    current = null;
-    mark(null);
-    history.replaceState(null, '', urlFor(null));
-    opener?.focus();
-  }
-
-  root.addEventListener('click', (e) => {
-    const target = e.target.closest('.blip[data-id], .pattern-list a[data-id]');
-    if (target) {
-      e.preventDefault();
-      opener = target;
-      return open(target.dataset.id);
-    }
-    if (e.target.closest('[data-close]')) {
-      e.preventDefault();
-      return close();
-    }
-    const stepper = e.target.closest('[data-step]');
-    if (stepper && current) {
-      e.preventDefault();
-      open(order[(order.indexOf(current) + Number(stepper.dataset.step) + order.length) % order.length]);
-    }
-  });
-  // While the drawer is open the keyboard belongs to it: Esc closes it, and the
-  // arrow keys step through the habits instead of moving the slides underneath.
-  document.addEventListener('keydown', (e) => {
-    if (drawer.hidden || e.metaKey || e.ctrlKey || e.altKey) return;
-    if (e.key === 'Escape') return close();
-    const step = { ArrowRight: 1, PageDown: 1, ArrowLeft: -1, PageUp: -1 }[e.key];
-    if (!step) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    const at = order.indexOf(current);
-    open(order[(at + step + order.length) % order.length]);
-  });
-}
-
 // Contribute pages: wait for the submission, then go to the results.
 const waitEl = document.querySelector('[data-wait]');
 if (waitEl) {
@@ -161,8 +56,13 @@ if (waitEl) {
 const deck = document.querySelector('[data-deck]');
 if (deck) {
   const slides = [...deck.querySelectorAll('.slide')];
-  const dots = [...document.querySelectorAll('.deck-nav .dot')];
-  const arrows = [...document.querySelectorAll('.deck-nav [data-step]')];
+  const dots = [...document.querySelectorAll('.deck-nav .dot, [data-deck-dot]')];
+  const arrows = [...document.querySelectorAll('.deck-nav [data-step], [data-deck-step]')];
+  const stepOf = (a) => Number(a.dataset.step ?? a.dataset.deckStep);
+  // The tour's top bar names the slide, and the lens links open the same slide.
+  const where = document.querySelector('[data-where]');
+  const lensLinks = [...document.querySelectorAll('[data-lens-link]')];
+  const names = dots.map((d) => d.querySelector('.tip')?.textContent ?? '');
   let current = 0;
 
   const goTo = (i) => {
@@ -179,8 +79,10 @@ if (deck) {
     if (i !== current) rewind(slides[current]);
     current = i;
     dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
+    if (where) where.textContent = `${String(i + 1).padStart(2, '0')} · ${names[i]}`;
+    for (const a of lensLinks) a.href = `${a.getAttribute('href').split('#')[0]}${i ? `#${slides[i].id}` : ''}`;
     for (const a of arrows) {
-      const target = i + Number(a.dataset.step);
+      const target = i + stepOf(a);
       const off = target < 0 || target >= slides.length;
       a.setAttribute('aria-disabled', String(off));
       if (!off) a.href = `#${slides[target].id}`;
@@ -196,13 +98,15 @@ if (deck) {
 
   document.addEventListener('click', (e) => {
     const go = e.target.closest('[data-goto]');
-    const step = e.target.closest('.deck-nav [data-step]');
-    if (go && !deck.contains(go) && !go.closest('.deck-nav, .deck-start')) return;
+    const step = e.target.closest('.deck-nav [data-step], [data-deck-step]');
+    if (go && !deck.contains(go) && !go.closest('.deck-nav, .deck-start, .tour-bar')) return;
     if (go) { e.preventDefault(); goTo(Number(go.dataset.goto)); }
-    else if (step) { e.preventDefault(); goTo(current + Number(step.dataset.step)); }
+    else if (step) { e.preventDefault(); goTo(current + stepOf(step)); }
   });
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
+    // An open details card keeps the keyboard: Esc closes it first.
+    if (document.querySelector('.tcard:popover-open')) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
   });
@@ -262,12 +166,80 @@ for (const map of document.querySelectorAll('[data-map]')) {
   map.addEventListener('pointerleave', hide);
 }
 
-// Previous and Next inside a setup's details: swap one popover for the other.
-// (Left to the browser, a popover opened from inside another stacks on top of it.)
+// ---------- the tour ----------
+
+// The radar's quadrant names filter it: one quadrant at a time, again to show all.
+for (const radar of document.querySelectorAll('[data-tradar]')) {
+  radar.addEventListener('click', (e) => {
+    const q = e.target.closest('[data-quad]');
+    if (!q) return;
+    const on = radar.dataset.only === q.dataset.quad;
+    if (on) delete radar.dataset.only; else radar.dataset.only = q.dataset.quad;
+    for (const b of radar.querySelectorAll('[data-quad]')) b.setAttribute('aria-pressed', String(!on && b === q));
+  });
+}
+
+// A button that shows or hides the element it controls: <button data-toggle aria-controls="id">.
 document.addEventListener('click', (e) => {
-  const btn = e.target.closest('.setup-pop .drawer-nav [popovertarget]');
+  const btn = e.target.closest('[data-toggle]');
   if (!btn) return;
-  e.preventDefault();
-  btn.closest('.setup-pop').hidePopover();
-  document.getElementById(btn.getAttribute('popovertarget'))?.showPopover();
+  const target = document.getElementById(btn.getAttribute('aria-controls'));
+  if (!target) return;
+  target.hidden = !target.hidden;
+  btn.setAttribute('aria-expanded', String(!target.hidden));
 });
+
+// Setups: Show more opens the next rarer setups, and the last row counts what is left.
+for (const list of document.querySelectorAll('[data-setups]')) {
+  const other = list.querySelector('[data-other]');
+  if (!other) continue;
+  const steps = JSON.parse(other.dataset.steps);
+  const rows = [...list.querySelectorAll('[data-more]')];
+  const more = other.querySelector('[data-more-btn]');
+  const less = other.querySelector('[data-less-btn]');
+  let at = 0;
+  const show = (k) => {
+    at = Math.max(0, Math.min(steps.length - 1, k));
+    let open = 0;
+    for (let i = 0; i < at; i++) open += steps[i].more;
+    rows.forEach((r, i) => { r.hidden = i >= open; });
+    const s = steps[at];
+    other.querySelector('[data-other-label]').firstChild.textContent = s.label;
+    other.querySelector('[data-other-share]').textContent = `${s.share}%`;
+    other.querySelector('[data-other-bar]').style.width = `${s.w}%`;
+    other.hidden = !s.label && !s.share;
+    more.hidden = !s.more;
+    more.textContent = `Show ${s.more} more`;
+    less.hidden = at === 0;
+  };
+  more.addEventListener('click', () => show(at + 1));
+  less.addEventListener('click', () => { show(0); list.scrollTo({ top: 0 }); });
+}
+
+// Models: switch between families and versions.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-stack-view]');
+  if (!btn) return;
+  const slide = btn.closest('section');
+  for (const b of slide.querySelectorAll('[data-stack-view]')) b.setAttribute('aria-pressed', String(b === btn));
+  for (const f of slide.querySelectorAll('[data-stack]')) f.hidden = f.dataset.stack !== btn.dataset.stackView;
+});
+
+// All tools: the search box keeps the tools whose name contains what is typed.
+for (const input of document.querySelectorAll('[data-tool-filter]')) {
+  const list = document.querySelector('[data-tools-list]');
+  input.addEventListener('input', () => {
+    const q = input.value.trim().toLowerCase();
+    let any = false;
+    for (const group of list.querySelectorAll('[data-group]')) {
+      const items = [...group.querySelectorAll('li[data-name]')];
+      let n = 0;
+      for (const li of items) { li.hidden = Boolean(q) && !li.dataset.name.includes(q); if (!li.hidden) n++; }
+      group.hidden = n === 0;
+      const count = group.querySelector('[data-count]');
+      count.textContent = q ? `${n} of ${items.length}` : `${items.length} ${items.length === 1 ? 'tool' : 'tools'}`;
+      any ||= n > 0;
+    }
+    list.querySelector('[data-no-match]').hidden = any;
+  });
+}
