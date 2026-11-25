@@ -107,7 +107,8 @@ Run it three ways:
 - `python3 "${TMPDIR:-/tmp}/llm-survey.py" read 1` prints the first page of the
   prompts the user typed, oldest first, and says how many pages there are.
   Each line is one prompt: `d` is the day, `s` the session. Links, emails,
-  paths, hosts, numbers and anything that looks like a secret are masked,
+  paths, hosts and other dotted names, numbers and anything that looks like
+  a secret are masked,
   long prompts are cut, and of pasted text only the start is shown.
   Sessions that ran this survey are left out. If your tool saves a page to
   a file instead of showing it, read it there; do not copy it.
@@ -155,7 +156,7 @@ The user's own messages matter far more than your replies.
 
 - **Read every prompt of the 30 days**, page by page with `read`, in order,
   before you form any theory. Searching for keywords first only finds the
-  habits you already expected. If there are more than 20 pages, read every
+  habits you already expected. If there are more than 30 pages, read every
   second page: they are in order of time, so that still covers the whole
   window, and the counting below covers every prompt either way.
 - **Look at what was pasted.** Pasted text and attachments are part of the

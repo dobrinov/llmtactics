@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../lib/db.js';
 import { cleanContribution, PROMPT_RANGES } from '../lib/shape.js';
-import { tailRange, radar, tools, experience, counted, percentile, compare } from '../lib/stats.js';
+import { tailRange, medianRange, radar, tools, experience, counted, percentile, compare } from '../lib/stats.js';
 
 const sub = (ids, extra = {}) => cleanContribution({
   assistant: 'Claude Code',
@@ -147,11 +147,15 @@ test('token measurements: the cost split, the context and subagents, from those 
   assert.equal(e.context.median, 88000);
 });
 
-test('the 95th and 99th percentile of ranges, once twenty people answered', () => {
+test('the 95th percentile from twenty answers, the 99th from a hundred; the last range is open', () => {
   const ids = [...Array(18).fill('100-300'), '1k-3k', '3k+'];
   assert.deepEqual(tailRange(PROMPT_RANGES, ids.slice(0, 19)), {});
-  const t = tailRange(PROMPT_RANGES, ids);
-  // The 19th of 20 answers ends the 1k-3k range; the 99th percentile is in the last range, which has no end.
-  assert.deepEqual(t.p95, { value: 3000, open: false });
-  assert.deepEqual(t.p99, { value: 3000, open: true });
+  // The 19th of 20 answers ends the 1k-3k range. Twenty answers are too few for a 99th percentile.
+  assert.deepEqual(tailRange(PROMPT_RANGES, ids), { p95: { value: 3000, open: false } });
+  const hundred = [...Array(95).fill('100-300'), ...Array(5).fill('3k+')];
+  assert.deepEqual(tailRange(PROMPT_RANGES, hundred), { p95: { value: 300, open: false }, p99: { value: 3000, open: true } });
+  // An id that is in no range gives no percentile, not an error.
+  assert.deepEqual(tailRange(PROMPT_RANGES, ['100-300', ...Array(19).fill('gone')]), { p95: null });
+  // A median in the last range is that range's start, never above the percentiles.
+  assert.equal(medianRange(PROMPT_RANGES, Array(20).fill('3k+')), 3000);
 });

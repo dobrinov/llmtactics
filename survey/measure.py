@@ -5,12 +5,12 @@
 #                    and the frequency, status and cost to report
 import glob, json, os, re, statistics, sys
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 DAYS = 30
 now = datetime.now(timezone.utc)
 # The window is 30 calendar days in the user's time zone, today included.
-since = datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(days=DAYS - 1)
+since = datetime.combine(date.today() - timedelta(days=DAYS - 1), time.min).astimezone()
 day_of = lambda t: t.astimezone().date()
 root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 # Text the harness writes into the user's turn; not something the user typed.
@@ -37,31 +37,52 @@ def typed(o, msg):
     return isinstance(c, str) and bool(c.strip()) and not c.lstrip().startswith(NOT_TYPED)
 
 
-CUE = r"password|passwd|pwd|passphrase|secret|token|api[-_ ]?key|cookie|bearer|otp"
+# Masking. The patterns go by ASCII letters, so that text in a script written without spaces is
+# left alone, and each starts at the start of a word, so that a long paste costs no time.
+CUE = r"(?<![A-Za-z])(?:password|passwd|pwd|passphrase|passcode|secret|token|api[-_ ]?key|cookie|bearer|otp)s?(?![A-Za-z])"
+VALUE = r"[\"']?[^\s\"',;]+[\"']?(?:,\s*[^\s\"',;]+)*"
+FILES = set("c cpp cs css csv env erb ex exs go h htm html java jpg js json jsx kt lock log md pdf php png py rb rs "
+            "scss sh sql svg swift toml ts tsx txt vue xml yaml yml".split())
+
+
+def path(m):  # two slashes or more, and a letter: not a date or a fraction
+    text = m.group(0)
+    return "[path]" if text.count("/") >= 2 and re.search("[A-Za-z]", text) else text
+
+
+def name(m):  # a host, or any dotted name; a file name such as stats.js stays
+    return m.group(0) if m.group(1).lower() in FILES else "[name]"
+
+
 MASKS = [
     (re.compile(r"https?://\S+"), "[link]"),
-    (re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b"), "[email]"),
-    # "the password is X", "changed the token to X", "cookie=X", "Bearer X": the word after the cue.
-    (re.compile(r"(?i)\b(%s)\b((?:\s+\w+){0,3}?\s+(?:to|is|was)\s+|\s*[=:]\s*)\S+" % CUE), r"\1\2[masked]"),
-    (re.compile(r"(?i)\b(bearer)\s+\S+"), r"\1 [masked]"),
-    (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"), "[address]"),
-    (re.compile(r"(?<![\w/])~?(?:/[\w.@-]+){2,}/?"), "[path]"),
-    (re.compile(r"(?i)\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|io|dev|sh|app|ai|co|cloud|internal|local)\b\S*"), "[host]"),
-    (re.compile(r"\S*%[0-9A-Fa-f]{2}\S*"), "[masked]"),
+    (re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b", re.A), "[email]"),
+    # "the password is X", "changed the token to X", "DB_PASSWORD=X", "password": "X": what follows the cue.
+    (re.compile(r"(?i)(%s[\"']?)((?:\s+[A-Za-z]+){0,3}?(?:\s+(?:to|is|was)\s+|\s*[=:]\s*))%s" % (CUE, VALUE)), r"\1\2[masked]"),
+    # "password hunter2", "API key sk-abc": the next word, when it is not an ordinary word.
+    (re.compile(r"(?i)(%s)\s+(?=\S*[\d_\-!@#$%%^&*+=])\S+" % CUE), r"\1 [masked]"),
+    (re.compile(r"(?i)\b(bearer)\s+\S+", re.A), r"\1 [masked]"),
+    (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", re.A), "[address]"),
+    (re.compile(r"(?<![\w/.~\\-])[A-Za-z]:\\[^\s\"']+", re.A), "[path]"),
+    (re.compile(r"(?<![\w/.~-])(?:~|\.{1,2})?/?[\w.@-]+(?:/[\w.@-]+)+/?", re.A), path),
+    (re.compile(r"(?<![\w.-])[\w-]{2,}(?:\.[\w-]+)*\.([A-Za-z]{2,})\b(?![\w-]*\()", re.A), name),
+    (re.compile(r"(?<![!-~])[!-~]*%[0-9A-Fa-f]{2}[!-~]*"), "[masked]"),
     # Any word of 8 characters or more that mixes letters and digits: keys, cookies, codes, ids.
-    (re.compile(r"(?=\S*\d)(?=\S*[^\W\d_])\S{8,}"), "[masked]"),
-    (re.compile(r"\b\d(?:[ -]?\d){4,}\b"), "[number]"),
+    (re.compile(r"(?<![!-~])(?=[!-~]*\d)(?=[!-~]*[A-Za-z])[!-~]{8,}"), "[masked]"),
+    (re.compile(r"\b\d(?:[ -]?\d){4,}\b", re.A), "[number]"),
 ]
 
 
 def masked(text, limit):
+    text = text[:limit * 5]  # what is shown is cut to `limit`; no need to mask a whole paste
     for pattern, to in MASKS:
         text = pattern.sub(to, text)
     return " ".join(text.split())[:limit]
 
 
 # The prompt log: one line for everything the user typed, slash commands included.
-SURVEY = re.compile(r"llm-survey|/contribute(\.md)?\b", re.I)  # a session that ran this survey is not a habit
+# A session that ran this survey is not a habit: it starts with the invitation, or names the script.
+SURVEY = re.compile(r"Fetch \S+/contribute\S* and follow|llm-survey\.py", re.I)
 log, older, surveyed = [], [], set()
 try:
     for line in open(os.path.join(root, "history.jsonl"), errors="ignore"):
@@ -77,13 +98,12 @@ try:
         if t < since:
             older.append((t, texts))
             continue
-        if any(SURVEY.search(x) for x in texts):
+        if o.get("sessionId") and any(SURVEY.search(x) for x in texts):
             surveyed.add(o.get("sessionId"))
         log.append((t, o.get("sessionId"), o["display"], pastes, texts))
 except OSError:
     pass
 log.sort(key=lambda e: e[0])
-every = log  # with the survey's own sessions, to tell where a prompt's turn ends
 log = [e for e in log if e[1] not in surveyed]
 log_days = sorted({day_of(e[0]) for e in log})
 mode = sys.argv[1] if len(sys.argv) > 1 else "measure"
@@ -96,7 +116,7 @@ if mode == "read":
         row = "d%02d s%d | %s" % (log_days.index(day_of(t)) + 1, order.setdefault(session, len(order) + 1), masked(text, 600))
         for paste in pastes:
             row += " [pasted: %s]" % (masked(paste, 120) if isinstance(paste, str) else "text not kept")
-        weight = len(row.encode()) + 1
+        weight = len(row.encode("utf-8", "replace")) + 1
         if size + weight > PAGE and pages[-1]:
             pages.append([])
             size = 0
@@ -105,7 +125,7 @@ if mode == "read":
     n = min(max(int(sys.argv[2]) if len(sys.argv) > 2 else 1, 1), len(pages))
     print("page %d of %d. %d prompts, %d sessions, %d days. d = day, s = session. Left out: %d sessions that ran this survey."
           % (n, len(pages), len(log), len(order), len(log_days), len(surveyed)))
-    print("\n".join(pages[n - 1]))
+    print("\n".join(pages[n - 1]).encode("utf-8", "replace").decode())
     sys.exit()
 
 requests = {}  # one per model reply: a reply is written as several lines, and copied into resumed sessions
@@ -144,7 +164,8 @@ for path in files:
         if o.get("type") == "assistant" and isinstance(usage, dict):
             if not sub:
                 stamps[session].append(t)
-            r = requests.setdefault(msg.get("id") or o.get("uuid"), {"model": msg.get("model"), "sub": sub, "session": session, "t": t})
+            r = requests.setdefault(msg.get("id") or o.get("uuid"), {"model": msg.get("model"), "sub": sub, "session": session, "t": t, "seen": set()})
+            r["seen"].add(session)  # a resumed session holds a copy of the replies before it
             for p in PARTS:
                 r[p] = max(r.get(p, 0), usage.get(p) or 0)
             for b in msg.get("content") or []:
@@ -182,9 +203,10 @@ if mode == "count":
     # session, subagents included, weighed by price. This is what makes a habit light or heavy.
     replies = defaultdict(list)
     for r in reqs:
-        replies[r["session"]].append((r["t"], sum(r[p] * PRICE[p] for p in PARTS)))
+        for session in r["seen"]:  # a copy sits before the first prompt of its session, so in no turn
+            replies[session].append((r["t"], sum(r[p] * PRICE[p] for p in PARTS)))
     turns = defaultdict(list)
-    for e in every:
+    for e in log:
         turns[e[1]].append(e[0])
     price = {}
     for session, starts in turns.items():
@@ -192,7 +214,8 @@ if mode == "count":
             end = starts[i + 1] if i + 1 < len(starts) else now
             if replies[session]:
                 price[(session, start)] = sum(c for t, c in replies[session] if start <= t < end)
-    usual = statistics.median([price[(e[1], e[0])] for e in log if (e[1], e[0]) in price] or [0])
+    # The usual prompt is one that got a reply: a command that starts no work is not the measure.
+    usual = statistics.median([c for c in price.values() if c] or [0])
     first_record = min([e[0] for e in older] or [since])
     for expression in sys.argv[2:]:
         try:

@@ -106,6 +106,6 @@ test('a country is kept only as a listed two-letter code', () => {
 });
 
 test('room for every known pattern and a few of the person\'s own', () => {
-  const patterns = Array.from({ length: 30 }, (_, i) => ({ title: `Habit ${i}`, summary: 's' }));
-  assert.equal(cleanContribution({ ...minimal, patterns }).patterns.length, 24);
+  const patterns = Array.from({ length: 40 }, (_, i) => ({ title: `Habit ${i}`, summary: 's' }));
+  assert.equal(cleanContribution({ ...minimal, patterns }).patterns.length, 32);
 });
