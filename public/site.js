@@ -111,6 +111,9 @@ if (deck) {
   // No Take part link while the Take part slide is showing.
   const joinLink = document.querySelector('.tour-join');
   const names = dots.map((d) => d.querySelector('.tip')?.textContent ?? '');
+  // The World · Company · You links open the other lens at this slide; a lens
+  // without it starts at the first one.
+  const lensLinks = [...document.querySelectorAll('.tour-bar .lens a')];
   let current = 0;
 
   const goTo = (i) => {
@@ -136,6 +139,7 @@ if (deck) {
     }
     document.body.dataset.slide = String(i);
     history.replaceState(null, '', i ? `#${slides[i].id}` : location.pathname);
+    for (const a of lensLinks) a.href = a.href.split('#')[0] + (i ? `#${slides[i].id}` : '');
   }
 
   const io = new IntersectionObserver((entries) => {
