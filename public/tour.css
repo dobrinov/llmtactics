@@ -317,9 +317,25 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .chips { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .chip { display: inline-flex; align-items: center; min-height: 44px; padding: 0 18px; border-radius: 999px; background: #fff; border: 1px solid #e2e8f0; font: 600 14px var(--sans); cursor: help; }
 .chip .tip { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
-.pulse.big { width: 14px; height: 14px; background: var(--ok); box-shadow: 0 0 0 8px #ddf1ee; animation: flow-pulse 1.6s ease-in-out infinite; }
-@keyframes flow-pulse { 50% { box-shadow: 0 0 0 13px #ddf1ee; } }
-@media (prefers-reduced-motion: reduce) { .pulse.big { animation: none; } }
+/* The assistant at work: a small radar whose sweep lights up what it finds
+   (habits, tools, models) as it passes. --t is one turn; each blip's delay is
+   its angle from the top, as a share of the turn, minus a turn. */
+.scan { --t: 2.8s; position: relative; width: 112px; height: 112px; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle, var(--ok) 0 4px, transparent 4.5px),
+    linear-gradient(#c7e5e0, #c7e5e0) 50% 0 / 1px 100% no-repeat, linear-gradient(#c7e5e0, #c7e5e0) 0 50% / 100% 1px no-repeat,
+    repeating-radial-gradient(circle, transparent 0 18px, #c7e5e0 18px 19px), var(--t2);
+  box-shadow: inset 0 0 0 1px #c7e5e0; }
+.scan-sweep { position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(transparent 0 70%, rgb(15 107 100 / 0.45) 100%); animation: scan-turn var(--t) linear infinite; }
+.blip { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; opacity: 0.15; animation: blip var(--t) ease-out infinite; }
+.blip.b1 { left: 74%; top: 26%; background: var(--q1); animation-delay: calc(var(--t) * (0.125 - 1)); }
+.blip.b2 { left: 70%; top: 76%; background: var(--q0); animation-delay: calc(var(--t) * (0.4 - 1)); }
+.blip.b3 { left: 22%; top: 58%; background: var(--q3); animation-delay: calc(var(--t) * (0.72 - 1)); }
+@keyframes scan-turn { to { transform: rotate(1turn); } }
+@keyframes blip { 0% { opacity: 1; transform: scale(1.5); box-shadow: 0 0 0 5px rgb(255 255 255 / 0.7); } 12% { transform: scale(1); box-shadow: 0 0 0 0 transparent; } 75%, 100% { opacity: 0.15; } }
+@media (prefers-reduced-motion: reduce) {
+  .scan-sweep { animation: none; transform: rotate(0.3turn); }
+  .blip { animation: none; opacity: 1; }
+}
 .seats { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
 .seat { width: 64px; height: 64px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font: 700 15px var(--sans); background: #fff; color: #94a3b8; border: 2px dashed #cbd5e1; }
 .seat.in { background: var(--q1); color: #fff; border: 2px solid var(--q1); }
