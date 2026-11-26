@@ -60,7 +60,7 @@ reads. Every later step uses it.
 {{MEASURE}}
 ```
 
-Run it three ways:
+Run it four ways:
 
 - `python3 "${TMPDIR:-/tmp}/llm-survey.py" measure` prints the numbers for step 2c:
   totals, medians and model names. It takes about a quarter of a minute.

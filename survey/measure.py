@@ -194,11 +194,21 @@ if mode == "tools":
         here.append("tmux")
     if os.environ.get("ZELLIJ"):
         here.append("Zellij")
-    terminal = TERMS.get(os.environ.get("TERM_PROGRAM", ""))
+    # Cursor's and Windsurf's terminals say "vscode" too: their app path or bundle id tells them apart.
+    def term_name(program, env):
+        if program != "vscode":
+            return TERMS.get(program)
+        hint = " ".join(env.get(k, "") for k in ("__CFBundleIdentifier", "VSCODE_GIT_ASKPASS_NODE", "VSCODE_GIT_ASKPASS_MAIN")).lower()
+        if "cursor" in hint or "todesktop" in hint or env.get("CURSOR_TRACE_ID"):
+            return "Cursor"
+        if "windsurf" in hint or "exafunction" in hint:
+            return "Windsurf"
+        return "VS Code"
+    terminal = term_name(os.environ.get("TERM_PROGRAM", ""), os.environ)
     if os.environ.get("TMUX"):
         try:
             out = subprocess.run(["tmux", "show-environment", "-g", "TERM_PROGRAM"], capture_output=True, text=True, timeout=5).stdout
-            terminal = TERMS.get(out.strip().partition("=")[2]) or terminal
+            terminal = term_name(out.strip().partition("=")[2], os.environ) or terminal
         except (OSError, subprocess.SubprocessError):
             pass
     for prefix, n in (("GHOSTTY_", "Ghostty"), ("ITERM_", "iTerm2"), ("KITTY_", "kitty"), ("WEZTERM_", "WezTerm"), ("ALACRITTY_", "Alacritty"), ("WARP_", "Warp")):
