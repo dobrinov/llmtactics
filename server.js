@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
-import { counted, MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
+import { MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
 import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
 import * as flow from './lib/flow.js';
 import { numbersOf, toolDetailOf, delta } from './lib/aggregate.js';
@@ -207,7 +207,7 @@ function surveyText(req, wait) {
 
 
 // A company's results open once MIN_GROUP people's answers have been reviewed.
-const companyOpen = async (company) => counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length >= MIN_GROUP;
+const companyOpen = async (company) => (await store.companyPeople(company.id)) >= MIN_GROUP;
 
 // This browser's own page, if it still exists.
 async function ownProfileId(req) {

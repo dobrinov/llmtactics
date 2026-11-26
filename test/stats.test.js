@@ -207,6 +207,9 @@ test('stored totals follow every change to an answer, and match a fresh count', 
       COUNT(DISTINCT COALESCE(profile_id, 'c' || id::text)) FILTER (WHERE status = 'accepted')::int AS people,
       COUNT(DISTINCT company_id) FILTER (WHERE status = 'accepted')::int AS companies FROM contributions`;
     assert.deepEqual(await store.counts(), { people: direct.people, companies: direct.companies }, what);
+    for (const { id } of await store.sql`SELECT id FROM companies`) {
+      assert.equal(await store.companyPeople(id), counted(await store.contributions({ companyId: id, status: 'accepted' })).length, what);
+    }
   };
   const me = await store.createProfile();
   const co = await store.createCompany({ name: 'Co' });
