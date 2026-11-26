@@ -101,9 +101,9 @@ if (waitEl) {
 const deck = document.querySelector('[data-deck]');
 if (deck) {
   const slides = [...deck.querySelectorAll('.slide')];
-  const dots = [...document.querySelectorAll('.deck-nav .dot, [data-deck-dot]')];
-  const arrows = [...document.querySelectorAll('.deck-nav [data-step], [data-deck-step]')];
-  const stepOf = (a) => Number(a.dataset.step ?? a.dataset.deckStep);
+  const dots = [...document.querySelectorAll('[data-deck-dot]')];
+  const arrows = [...document.querySelectorAll('[data-deck-step]')];
+  const stepOf = (a) => Number(a.dataset.deckStep);
   // The tour's top bar names the slide, and the lens links open the same slide.
   const where = document.querySelector('[data-where]');
   const lensLinks = [...document.querySelectorAll('[data-lens-link]')];
@@ -118,7 +118,6 @@ if (deck) {
   // starts from the beginning the next time it is shown.
   const rewind = (slide) => {
     slide.scrollTop = 0;
-    for (const el of slide.querySelectorAll('.tool-strip, .country-list, [data-scroll-list] ul')) el.scrollTo(0, 0);
   };
   function mark(i) {
     if (i !== current) rewind(slides[current]);
@@ -143,8 +142,8 @@ if (deck) {
 
   document.addEventListener('click', (e) => {
     const go = e.target.closest('[data-goto]');
-    const step = e.target.closest('.deck-nav [data-step], [data-deck-step]');
-    if (go && !deck.contains(go) && !go.closest('.deck-nav, .deck-start, .tour-bar')) return;
+    const step = e.target.closest('[data-deck-step]');
+    if (go && !deck.contains(go) && !go.closest('.tour-bar')) return;
     if (go) { e.preventDefault(); goTo(Number(go.dataset.goto)); }
     else if (step) { e.preventDefault(); goTo(current + stepOf(step)); }
   });
@@ -165,22 +164,6 @@ if (deck) {
   });
   const start = slides.findIndex((s) => `#${s.id}` === location.hash);
   if (start > 0) deck.scrollTo({ left: slides[start].offsetLeft, behavior: 'instant' });
-}
-
-// Long lists on slides: arrow buttons scroll the list, and switch off at either end.
-for (const box of document.querySelectorAll('[data-scroll-list]')) {
-  const list = box.querySelector('ul');
-  const [up, down] = box.querySelectorAll('[data-scroll]');
-  const update = () => {
-    up.disabled = list.scrollTop <= 2;
-    down.disabled = list.scrollTop + list.clientHeight >= list.scrollHeight - 2;
-    const hide = up.disabled && down.disabled;
-    up.hidden = hide; down.hidden = hide;
-  };
-  for (const b of [up, down]) b.addEventListener('click', () => list.scrollBy({ top: Number(b.dataset.scroll) * list.clientHeight * 0.6 }));
-  list.addEventListener('scroll', update, { passive: true });
-  addEventListener('resize', update);
-  update();
 }
 
 // The world map: a country's name and its number of people follow the pointer.

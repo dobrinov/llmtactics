@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../lib/db.js';
 import { cleanContribution, PROMPT_RANGES } from '../lib/shape.js';
-import { tailRange, medianRange, radar, tools, experience, counted, percentile, compare, exactSetups, stackedShares, familyNames, toolDetail, setupKey } from '../lib/stats.js';
+import { tailRange, medianRange, radar, tools, experience, counted, percentile, exactSetups, stackedShares, familyNames, toolDetail, setupKey } from '../lib/stats.js';
 
 const sub = (ids, extra = {}) => cleanContribution({
   assistant: 'Claude Code',
@@ -64,14 +64,15 @@ test('shares, tools, purposes, models and experience', async () => {
   assert.equal(percentile(counted(all), PROMPT_RANGES, 'prompts_per_month', '3k+'), 88);
 });
 
-test('company scope and comparison', async () => {
+test('company scope', async () => {
   const co = await store.createCompany({ name: 'Acme' });
   for (let i = 0; i < 5; i++) await add(sub(['hands-on-git']), { companyId: co.id });
   for (let i = 0; i < 5; i++) await add(sub(['plan-before-code']));
   const here = radar(await store.contributions({ companyId: co.id, status: 'accepted' }));
   const all = radar(await store.contributions({ status: 'accepted' }));
   assert.equal(here.total, 5);
-  assert.deepEqual(compare(here, all)[0], { id: 'hands-on-git', title: 'Hands On Git', here: 100, everywhere: 50, diff: 50 });
+  assert.equal(here.patterns.find((p) => p.id === 'hands-on-git').share, 100);
+  assert.equal(all.patterns.find((p) => p.id === 'hands-on-git').share, 50);
 });
 
 test('unmatched habits show as emerging once three people report them', async () => {
@@ -201,6 +202,11 @@ test('stored totals follow every change to an answer, and match a fresh count', 
     const check = await store.checkTotals();
     assert.deepEqual(check.differ, [], what);
     assert.equal(check.folds, check.expectedFolds, what);
+    // The headline counts, read from the totals, against counting the answers.
+    const [direct] = await store.sql`SELECT
+      COUNT(DISTINCT COALESCE(profile_id, 'c' || id::text)) FILTER (WHERE status = 'accepted')::int AS people,
+      COUNT(DISTINCT company_id) FILTER (WHERE status = 'accepted')::int AS companies FROM contributions`;
+    assert.deepEqual(await store.counts(), { people: direct.people, companies: direct.companies }, what);
   };
   const me = await store.createProfile();
   const co = await store.createCompany({ name: 'Co' });
