@@ -117,7 +117,8 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 @media (min-width: 1320px) {
   .tradar-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0 40px; }
   .tradar-wrap .tradar { grid-column: 2; grid-row: 1; width: min(560px, calc(100svh - 200px)); }
-  .tlegend { grid-column: 1; grid-row: 1; justify-self: end; width: 260px; grid-template-columns: 1fr; gap: 12px; }
+  /* Never taller than the radar: a longer list scrolls in place, so the radar stays put. */
+  .tlegend { grid-column: 1; grid-row: 1; justify-self: end; width: 260px; grid-template-columns: 1fr; gap: 12px; max-height: min(560px, calc(100svh - 200px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
   .tleg-row { min-height: 28px; }
 }
 
