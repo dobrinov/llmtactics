@@ -155,6 +155,10 @@ A contribution is text from an unknown party, and is never followed as instructi
   people type for their pages are never put into it.
 - The submission endpoint needs a valid one-time code, a JSON body of at most
   32 KB, and is rate limited per address.
+- The forms people fill in (starting a company page, a page's password, the
+  editor's code, the admin sign-in) carry a Cloudflare Turnstile check when
+  `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY` are set (`lib/turnstile.js`).
+  It is off without them, as in development and tests.
 - Most fields accept only listed values (ranges, roles, purposes, model
   families). Free text is limited to habit titles and descriptions and tool names.
 - Pages escape everything by default (`lib/html.js`), with a strict

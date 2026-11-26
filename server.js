@@ -15,6 +15,7 @@ import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injec
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
 import { companyName } from './lib/html.js';
+import { turnstile, ORIGIN as TURNSTILE, CHECK_FAILED } from './lib/turnstile.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4400);
@@ -53,7 +54,7 @@ const SECURITY_HEADERS = {
   'Referrer-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
   'Cross-Origin-Opener-Policy': 'same-origin',
-  'Content-Security-Policy': "default-src 'self'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+  'Content-Security-Policy': `default-src 'self'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'${turnstile.on ? ` ${TURNSTILE}; frame-src ${TURNSTILE}` : ''}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
   ...(SECURE ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
 };
 
@@ -83,6 +84,8 @@ function readBody(req) {
   });
 }
 const readForm = async (req) => Object.fromEntries(new URLSearchParams(await readBody(req)));
+// Whether a person sent this form (Cloudflare Turnstile; always true when it is off).
+const isPerson = (req, form) => turnstile.passed(form['cf-turnstile-response'], process.env.TRUST_PROXY ? clientIp(req) : null);
 
 // The client address: behind the bundled Caddy proxy, the last X-Forwarded-For entry.
 const clientIp = (req) => (process.env.TRUST_PROXY ? req.headers['x-forwarded-for']?.split(',').at(-1)?.trim() : null) || req.socket.remoteAddress;
@@ -286,7 +289,7 @@ async function profileData(req, profile, acc) {
 const inviteLink = async (req, profileId) => `${baseUrl(req)}/contribute?from=${await store.inviteCode(profileId)}`;
 async function editPage(req, res, url, kind, row, acc) {
   const error = url.searchParams.get('error');
-  if (!acc.owner) return privateHtml(res, views.editGatePage({ kind, row, error: Boolean(error) }));
+  if (!acc.owner) return privateHtml(res, views.editGatePage({ kind, row, error }));
   return privateHtml(res, views.editPage({
     kind, row, code: shownCode(req, kind, row.id), saved: url.searchParams.has('saved'),
     error: error && error !== 'wrong' ? error.slice(0, 200) : null,
@@ -687,6 +690,7 @@ async function post(req, res, url, p, m) {
     if (limited(req, 'company', 10, 3600_000)) return send(res, 429, 'Too many company pages from this address. Try again later.', 'text/plain');
     // A password can be added later, on the page's edit page.
     const form = await readForm(req);
+    if (!(await isPerson(req, form))) return redirect(res, `/contribute?for=company&error=${encodeURIComponent(CHECK_FAILED)}`);
     const company = await store.createCompany({ name: cleanName(form.name, 80), passwordHash: null });
     const issued = await issueCode('c', company.id);
     return redirect(res, `/c/${company.id}/invite`, { 'Set-Cookie': grantCookie(req, [`oc:${company.id}`, issued.entry]) });
@@ -704,6 +708,7 @@ async function post(req, res, url, p, m) {
     const form = await readForm(req);
     const next = backTo(form.next, kind, id, `/${kind}/${id}`);
     if (!row.password_hash) return redirect(res, next);
+    if (!(await isPerson(req, form))) return redirect(res, `${next}?error=check`);
     if (!verifyPassword(String(form.password || ''), row.password_hash)) {
       wrongGuess(req, bucket, 15 * 60_000);
       return redirect(res, `${next}?error=wrong`);
@@ -722,6 +727,7 @@ async function post(req, res, url, p, m) {
     const row = kind === 'u' ? await store.profile(id) : await store.company(id);
     if (!row) return html(res, views.notFoundPage(), 404);
     const form = await readForm(req);
+    if (!(await isPerson(req, form))) return redirect(res, `/${kind}/${id}/edit?error=check`);
     if (!verifyEditorCode(form.code, row.editor_code_hash)) {
       wrongGuess(req, bucket, 15 * 60_000);
       return redirect(res, `/${kind}/${id}/edit?error=wrong`);
@@ -765,6 +771,7 @@ async function post(req, res, url, p, m) {
     const wait = guessesLeft(req, 'admin-login', 5, 15 * 60_000);
     if (wait) return tooMany(res, wait);
     const form = await readForm(req);
+    if (!(await isPerson(req, form))) return redirect(res, '/samodidopipatuk/login?error=check');
     if (!safeEqual(String(form.password || ''), ADMIN_PASSWORD)) {
       wrongGuess(req, 'admin-login', 15 * 60_000);
       return redirect(res, '/samodidopipatuk/login?error=1');
