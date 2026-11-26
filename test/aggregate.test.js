@@ -125,3 +125,18 @@ test('a company shows no month or country with fewer than the minimum of people'
   const all = numbersOf(cellsOf(cells, 'c:co1'), NOW);
   assert.equal(n.where.reduce((a, c) => a + c.count, 0) + n.elsewhere, all.where.reduce((a, c) => a + c.count, 0));
 });
+
+test('a company month is hidden when the headline without it would point at a few people', () => {
+  // Seven people answered this month and two last month: the headline counts nine.
+  const mk = (id, daysAgo) => ({ id, profile_id: `p${id}`, company_id: 'co1', created_at: new Date(NOW - daysAgo * 864e5).toISOString(),
+    country: 'gb', patterns: [], tools: [{ name: 'Cursor', kind: 'editor' }], models: ['claude-opus@4.5'], purposes: [] });
+  const rows = [...Array.from({ length: 7 }, (_, i) => mk(i + 1, 5)), mk(8, 40), mk(9, 41)];
+  const { cells } = foldAll(rows);
+  const n = numbersOf(cellsOf(cells, 'c:co1'), NOW, { minGroup: 5 });
+  assert.equal(n.radar.total, 9);
+  assert.ok(n.families.months.every((m) => m.n === 0), 'November alone would leave the two October people');
+  // With five in October the difference is a group of five, and both months show.
+  const more = [...rows, mk(10, 42), mk(11, 43), mk(12, 44)];
+  const m = numbersOf(cellsOf(foldAll(more).cells, 'c:co1'), NOW, { minGroup: 5 });
+  assert.deepEqual(m.families.months.filter((x) => x.n).map((x) => x.n), [5, 7]);
+});
