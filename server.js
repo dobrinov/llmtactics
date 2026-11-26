@@ -286,7 +286,8 @@ async function profileData(req, profile, acc) {
 
 // The page where a page is renamed, protected or deleted. Without the owner
 // grant it asks for the editor's code first.
-const inviteLink = async (req, profileId) => `${baseUrl(req)}/contribute?from=${await store.inviteCode(profileId)}`;
+// An invitation opens the tour, which explains the site, rather than the first step of taking part.
+const inviteLink = async (req, profileId) => `${baseUrl(req)}/?from=${await store.inviteCode(profileId)}`;
 async function editPage(req, res, url, kind, row, acc) {
   const error = url.searchParams.get('error');
   if (!acc.owner) return privateHtml(res, views.editGatePage({ kind, row, error }));
@@ -581,7 +582,14 @@ async function handle(req, res) {
 
   // The whole presentation: introduction, everyone's numbers, the invitation.
   // The tour and the tool pages depend on this browser's cookie (its lenses), so they are never cached.
-  if (p === '/') return privateHtml(res, tourPage(await tourData(req, {})));
+  if (p === '/') {
+    const t = await tourData(req, {});
+    // An invitation link names its sender, and nothing else about them; taking part from here keeps it.
+    const code = url.searchParams.get('from');
+    const inviter = t.tookPart ? null : await store.profileByInvite(code);
+    if (inviter) t.invite = { name: inviter.name, join: `/contribute?from=${code}` };
+    return privateHtml(res, tourPage(t));
+  }
   const toolsAt = m(/^\/tools(?:\/([a-z0-9-]{1,80}))?$/);
   if (toolsAt) return toolsRoute(res, await tourData(req, {}), toolsAt[1]);
   if (p === '/contribute') {
