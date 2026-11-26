@@ -78,13 +78,15 @@ come from answers arriving month after month, not from anyone's old history.
 Within the 30 days the assistant counts instead of sampling. The prompt
 points to a script, `survey/measure.py` (served at `/llm-survey.py`, so the
 prompt stays short enough for a fetch tool to return whole), that
-Claude Code downloads into the temporary folder and reads before running it, the one file the survey writes,
+Claude Code or Codex downloads into the temporary folder and reads before running it, the one file the survey writes,
 and deletes at the end. It has four uses:
 
 - `measure` reads every transcript, including the subagents' (which a
   `projects/*/*.jsonl` glob misses), counts each model reply once (a reply
   is written on several lines and copied into resumed sessions), and prints
-  only totals, medians and model names;
+  only totals, medians and model names. It reads Codex's sessions too
+  (`~/.codex/sessions`, or `CODEX_HOME`): a reply there is the `token_count`
+  event after it, once per running total, since forked sessions copy them;
 - `read N` prints a page of the prompts the user typed, with links, emails,
   paths, hosts, numbers and anything that looks like a secret masked, so
   that the assistant reads every prompt without reading a password. A

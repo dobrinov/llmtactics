@@ -51,8 +51,8 @@ Work through the steps below in order, starting with step 0.
 Before you read or run anything, tell the user in one short message what
 this survey will read on their machine, and that none of it leaves it:
 
-- the Claude Code transcripts and prompt log of the last 30 days (or your own
-  tool's history), read through a script that masks links, paths, names,
+- the Claude Code and Codex transcripts and prompt logs of the last 30 days
+  (or your own tool's history), read through a script that masks links, paths, names,
   numbers and secrets before you see a prompt;
 - instruction files (`CLAUDE.md`, `AGENTS.md` and the like) and settings;
 - for the list of tools only: the first word of each shell history line, the
@@ -87,12 +87,12 @@ Where the records usually are:
 | Tool | Where history usually lives |
 | --- | --- |
 | Claude Code | `~/.claude/projects/**/*.jsonl` (transcripts with token counts; subagents' are in `subagents/` folders below each session), `~/.claude/history.jsonl` (every prompt the user typed, one per line) |
-| Codex CLI | `~/.codex/history.jsonl`, `~/.codex/sessions/` |
+| Codex CLI | `~/.codex/sessions/**/*.jsonl` (one file per session, with token counts), `~/.codex/history.jsonl` (every prompt the user typed) |
 | Gemini CLI | `~/.gemini/tmp/*/` (chat logs and checkpoints) |
 | Cursor, Copilot, Windsurf, other IDE agents | whatever chat history or workspace storage you can read |
 | ChatGPT, Claude, Gemini apps | your past-conversation search and memory tools |
 
-**If you are Claude Code**, download the script into the temporary folder.
+**If you are Claude Code or Codex**, download the script into the temporary folder.
 It only reads, makes no network requests, and every later step uses it:
 
 ```sh
@@ -129,11 +129,16 @@ Run it four ways:
   match, whether that is enough to report (`qualifies`), and the
   `frequency`, `status` and `cost` to report.
 
+The script reads Claude Code's history and Codex's together (`CLAUDE_CONFIG_DIR`
+and `CODEX_HOME` move them), and `measure` says how many transcripts of
+each it read (`transcripts_read`). For Codex it weighs an output token as 8
+and has no cache writes, as OpenAI bills them.
+
 `measure` counts from the transcripts and leaves out slash commands; `read`
 and `count` go by the prompt log, which has them. Their totals differ a
 little. The numbers of step 2c come from `measure`.
 
-**If you are another tool, or there is no `python3`**, do the same things
+**If you are any other tool, or there is no `python3`**, do the same things
 from your own records, by the same rules:
 
 - every session of the last 30 days, by the date of each record, not of the
@@ -297,7 +302,7 @@ are easy to miss. Look for them on purpose, without changing anything:
 - **Review tools:** diff viewers, review bots and review commands the user
   names or pastes output from.
 
-If you are Claude Code, start from the `tools` output of the script: every
+If you are Claude Code or Codex, start from the `tools` output of the script: every
 tool with `days` above 0, or `open` now, is in use. One that is only
 `installed` is not. Add what the script cannot see (connectors, review tools,
 chat assistants used in a browser) from your history and configuration.
@@ -378,7 +383,8 @@ As `efficiency`:
   percentages that add up to 100 (`cost_split_pct`): `reread` (the
   conversation read from the cache), `loaded` (new input and cache writes),
   `written` (output). Weigh a cached token as 0.1 of a new input token, a
-  cache write as 1.25 and an output token as 5.
+  cache write as 1.25 and an output token as 5 (for OpenAI models, an
+  output token as 8; they have no cache writes).
 - `subagent_share`: the whole percentage of the tokens that subagents used
   (`subagent_tokens_pct`); `0` if the user runs none.
 - `minutes_per_task`: the median session's length in minutes, breaks of more
