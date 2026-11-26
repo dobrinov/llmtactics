@@ -34,6 +34,8 @@
 .tip a { color: #fff; }
 .tdot-nav .tip { top: 42px; left: 50%; transform: translateX(-50%); }
 .ht:hover > .tip, .ht:focus-visible > .tip, .ht:focus-within > .tip, .tdot-nav:hover .tip, .tdot-nav:focus-visible .tip, .tc:hover > .tip, .tc:focus-visible > .tip, .hdot:hover > .tip, .hdot:focus-visible > .tip, .tour-side:hover .tip { opacity: 1; }
+/* One tip at a time: a hovered host wins over one that only holds focus. */
+body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, .tc, .hdot, .tour-side):not(:hover) > .tip { opacity: 0; }
 .tip-note { color: #cbd5e1; }
 
 .tour-head { text-align: center; flex: none; }

@@ -170,7 +170,7 @@ test('whole setups: each person in exactly one, so the shares add up to 100%', a
   const s = exactSetups(await store.contributions({ status: 'accepted' }));
   assert.equal(s.total, 4);
   assert.equal(s.none, 1);
-  assert.deepEqual(s.setups.map((x) => [x.key, x.count]), [['claude code|tmux', 2], ['cursor', 1]]);
+  assert.deepEqual(s.setups.map((x) => [x.key, x.count]), [['claude code\ntmux', 2], ['cursor', 1]]);
   assert.equal(Math.round(s.setups.reduce((a, x) => a + x.share, 0) + (100 * s.none) / s.total), 100);
 });
 

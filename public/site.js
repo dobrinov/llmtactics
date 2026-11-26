@@ -151,7 +151,7 @@ if (deck) {
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
     // An open details card keeps the keyboard: Esc closes it first.
-    if (document.querySelector('.tcard:popover-open')) return;
+    try { if (document.querySelector('.tcard:popover-open')) return; } catch { /* no :popover-open support */ }
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
   });

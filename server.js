@@ -506,7 +506,7 @@ async function handle(req, res) {
     const w = await store.liveWait(waitPage[1]);
     if (!w) return redirect(res, '/');
     const r = await resolveWait(req, w);
-    if (r.status === 'waiting') return redirect(res, '/contribute');
+    if (r.status !== 'done') return redirect(res, '/contribute');
     return redirect(res, r.redirect, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
   }
   if (p === '/privacy') return html(res, views.privacyPage());
