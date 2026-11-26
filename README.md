@@ -73,6 +73,15 @@ it, but the password only opens the page.
    start when the way answers are counted changes (`VERSION` in
    `lib/aggregate.js`).
 
+## Asking for a new answer
+
+An answer covers 30 days, so a month after a browser's last answer onto its
+own page, opening the tour (`/`, that page, or a company's tour) shows a
+welcome-back page instead: when they last took part, and "Run it again" or
+"Not now". "Not now" (`POST /later`) leads on to the page they opened and is
+remembered in the access cookie for a month; meanwhile the tour's intro keeps
+a one-line reminder.
+
 ## What the survey measures
 
 Every answer describes the person's **last 30 days**, not their whole

@@ -275,6 +275,27 @@ async function lastAnswered(req) {
 const ASK_AGAIN_AFTER = 30 * 24 * 3600_000;
 const dueAgain = (at) => Boolean(at) && Date.now() - new Date(at).getTime() >= ASK_AGAIN_AFTER;
 
+// "Not now" on the welcome-back page: this browser is not asked again until
+// then (a "later:<until>" entry among the grants), and sees the quieter line
+// on the tour's intro instead.
+const ASK_LATER_FOR = 30 * 24 * 3600_000;
+const askedLater = (req) => grantsOf(req).some((g) => g.startsWith('later:') && Number(g.slice(6)) > Date.now());
+const isLater = (g) => g.startsWith('later:');
+// A page "Not now" may lead on to: the tour, a person's or a company's.
+const tourPath = (next) => (typeof next === 'string' && /^\/(?:u\/[a-z0-9]{10}|c\/[a-z0-9]{8})?$/.test(next) ? next : '/');
+
+// The tour, or in its place the welcome-back page when this browser's last
+// answer is a month old or more and it has not said "Not now" lately.
+function tourOrWelcome(req, res, t, path) {
+  const again = t.lens === 'company' ? t.joinCompany : t.again;
+  // On a person's page, only the browser that owns it (not the admin, who may open any page).
+  const own = t.lens !== 'you' || grantsOf(req).includes(`ou:${t.profile.id}`);
+  if (t.lastAnswer && again && own && !askedLater(req)) {
+    return privateHtml(res, flow.welcomeBackPage({ lastAnswer: t.lastAnswer, again, next: path, company: t.lens === 'company' ? { name: t.groupName } : null }));
+  }
+  return privateHtml(res, tourPage(t));
+}
+
 // Whether this browser has answered recently, onto a page of its own. Such a
 // browser is offered to run it again quietly, not asked to take part.
 const tookPart = async (req) => { const at = await lastAnswered(req); return Boolean(at) && !dueAgain(at); };
@@ -589,7 +610,7 @@ async function handle(req, res) {
     const code = url.searchParams.get('from');
     const inviter = t.tookPart ? null : await store.profileByInvite(code);
     if (inviter) t.invite = { name: inviter.name, join: `/contribute?from=${code}` };
-    return privateHtml(res, tourPage(t));
+    return tourOrWelcome(req, res, t, '/');
   }
   // One tactic's deck, through everyone's numbers. The radar is where they all are.
   if (p === '/tactics') return redirect(res, '/#tactics');
@@ -633,7 +654,7 @@ async function handle(req, res) {
     const t = await tourData(req, { profile, acc });
     if (prof[2]?.startsWith('/tools')) return t ? toolsRoute(res, t, prof[3]) : redirect(res, `/u/${profile.id}`);
     // A page with an answer is the tour through its lens; one without, an invitation to answer.
-    if (t) return privateHtml(res, tourPage(t));
+    if (t) return tourOrWelcome(req, res, t, `/u/${profile.id}`);
     return privateHtml(res, views.profilePage({ ...(await profileData(req, profile, acc)), code: acc.owner ? shownCode(req, 'u', profile.id) : null, invite: acc.owner ? await inviteLink(req, profile.id) : null }));
   }
 
@@ -672,7 +693,7 @@ async function handle(req, res) {
       return privateHtml(res, flow.companyProgressPage({ company, base: baseUrl(req), seats, owner: acc.owner, lastAnswer: dueAgain(last) ? last : null }));
     }
     const t = await tourData(req, { company, acc });
-    return comp[2] ? toolsRoute(res, t, comp[3]) : privateHtml(res, tourPage(t));
+    return comp[2] ? toolsRoute(res, t, comp[3]) : tourOrWelcome(req, res, t, `/c/${company.id}`);
   }
 
   // The link an assistant opens after submitting.
@@ -724,6 +745,12 @@ async function post(req, res, url, p, m) {
     const company = await store.createCompany({ name: cleanName(form.name, 80), passwordHash: null });
     const issued = await issueCode('c', company.id);
     return redirect(res, `/c/${company.id}/invite`, { 'Set-Cookie': grantCookie(req, [`oc:${company.id}`, issued.entry]) });
+  }
+
+  // "Not now" on the welcome-back page.
+  if (p === '/later') {
+    const form = await readForm(req);
+    return redirect(res, tourPath(form.next), { 'Set-Cookie': grantCookie(req, [`later:${Date.now() + ASK_LATER_FOR}`], isLater) });
   }
 
   // Unlocking a password-protected page.
