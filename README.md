@@ -28,7 +28,7 @@ npm test                  # needs the llmpatterns_test database
 | `/c/<id>` | The tour through a company's lens, next to everyone. Until 5 people's answers have been reviewed: how many have answered. `/c/<id>/tools` likewise |
 | `/c/<id>/contribute` | The page to send to colleagues: the Just me steps, with the answer counting for the company too |
 | `/c/<id>/invite` | For the person who started the page: the link for colleagues and their own line; once 5 have answered, that the results are open |
-| `/admin` | Contributions, review, and how to run the analysis. `/admin/totals`: whether the stored totals match the answers, and a rebuild |
+| `/samodidopipatuk` | Contributions, review, and how to run the analysis. `/samodidopipatuk/totals`: whether the stored totals match the answers, and a rebuild |
 | `/contribute.md?t=<code>`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). Without a live code, `/contribute.md` is a copy for reading. `/u/<id>/contribute.md?t=<code>`, the older form of the line, still works |
 
 There is no sign-up. The browser that created a page holds a signed cookie that
@@ -64,7 +64,7 @@ it, but the password only opens the page.
 6. Every change to an answer (accepted, rejected, re-matched, deleted) updates
    the stored totals for that one person, in the same transaction (tables
    `aggregates` and `folded`). The tour reads only these totals. They can be
-   rebuilt from the answers at any time on `/admin/totals`, and are rebuilt on
+   rebuilt from the answers at any time on `/samodidopipatuk/totals`, and are rebuilt on
    start when the way answers are counted changes (`VERSION` in
    `lib/aggregate.js`).
 
@@ -160,7 +160,7 @@ npm run analyse -- --local --production   # production database, over SSH with t
 ```
 
 Needs `ANTHROPIC_API_KEY`. The model is `claude-opus-5-5`; set `ANALYSIS_MODEL`
-to change it. `/admin/analysis` has the same instructions with the live counts.
+to change it. `/samodidopipatuk/analysis` has the same instructions with the live counts.
 
 ## Deploying
 
