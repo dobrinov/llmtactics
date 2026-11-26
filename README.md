@@ -149,9 +149,22 @@ npm run analyse -- --id 123     # one contribution again
 Needs `ANTHROPIC_API_KEY`. The model is `claude-opus-5-5`; set `ANALYSIS_MODEL`
 to change it. `/admin/analysis` has the same instructions with the live counts.
 
-## Deploying on Hetzner
+## Deploying
 
-One small cloud server (CX22 is enough) with Docker:
+llmtactics.com runs on a shared Hetzner host next to other apps: one Caddy and
+one Postgres 17 serve all of them, and a nightly job there backs up every
+database (`/opt/infra/README.md` on the server). The files for that host are in
+`deploy/host/`. Deploy the last commit from this machine:
+
+```sh
+deploy/ship.sh            # or deploy/ship.sh <sha> to roll back
+ssh root@89.167.69.250 docker logs -f llmtactics-web
+```
+
+### On a server of its own
+
+`docker-compose.yml` runs everything on one small server (CX22 is enough):
+PostgreSQL, the app, Caddy for HTTPS and a nightly dump.
 
 ```sh
 # on the server, once
