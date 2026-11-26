@@ -29,7 +29,7 @@ npm test                  # needs the llmpatterns_test database
 | `/c/<id>/contribute` | The page to send to colleagues: the Just me steps, with the answer counting for the company too |
 | `/c/<id>/invite` | For the person who started the page: the link for colleagues and their own line; once 5 have answered, that the results are open |
 | `/admin` | Contributions, review, and how to run the analysis. `/admin/totals`: whether the stored totals match the answers, and a rebuild |
-| `/u/<id>/contribute.md`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). `/contribute.md` is a copy for reading |
+| `/contribute.md?t=<code>`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). Without a live code, `/contribute.md` is a copy for reading. `/u/<id>/contribute.md?t=<code>`, the older form of the line, still works |
 
 There is no sign-up. The browser that created a page holds a signed cookie that
 lets it rename, protect or delete the page at `/u/<id>/edit` or `/c/<id>/edit`.
@@ -41,13 +41,14 @@ it, but the password only opens the page.
 ## How a contribution flows
 
 1. A contribute page shows one line to paste:
-   - for yourself, `Fetch <base>/u/<id>/contribute.md?t=<code> and follow the instructions in it.`
-     The `<id>` is the address your results page will get; `<code>` is the
-     one-time code of this line, so two open lines for one page never take
-     each other's answers.
+   - for yourself, `Fetch <base>/contribute.md?t=<code> and follow the instructions in it.`
+     `<code>` is the one-time code of this line. It knows which page the
+     answer goes to, so two open lines for one page never take each other's
+     answers.
      A company's contribute page shows the same kind of line, with the company
-     on the one-time code. (`<base>/c/<id>/contribute.md` still works: each
-     fetch gets its own code.)
+     on the one-time code. Lines of the older form
+     `<base>/u/<id>/contribute.md?t=<code>` still work, and so does
+     `<base>/c/<id>/contribute.md`, where each fetch gets its own code.
 2. The prompt served at that address carries a one-time code (table `waits`)
    in its submit URL, `/api/contributions?t=<code>`. The code works once and
    expires after two days. The contribute page follows the code: it moves to

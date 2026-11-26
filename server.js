@@ -249,16 +249,15 @@ async function ownProfileId(req) {
   return id && (await store.profile(id)) ? id : null;
 }
 
-// The line people paste: their page's address, and the wait it answers.
-const lineFor = (req, pageId, token) => flow.promptLine(`${baseUrl(req)}/u/${pageId}/contribute.md?t=${token}`);
+// The line people paste: the prompt, with the one-time code of the wait it answers.
+const lineFor = (req, token) => flow.promptLine(`${baseUrl(req)}/contribute.md?t=${token}`);
 
 // A one-time code for answering through a company. A browser that already has
 // a page answers onto it; anyone else gets a new page, reserved now.
-// `pageId` is the address in the line to paste.
 async function companyWait(req, company) {
   const own = await ownProfileId(req);
-  const { token, reservedId } = await store.createWait({ companyId: company.id, profileId: own, browser: true });
-  return { token, pageId: own ?? reservedId, headers: own ? {} : { 'Set-Cookie': waitCookie(req, token) } };
+  const { token } = await store.createWait({ companyId: company.id, profileId: own, browser: true });
+  return { token, headers: own ? {} : { 'Set-Cookie': waitCookie(req, token) } };
 }
 
 // A person's page before its first answer.
@@ -476,10 +475,10 @@ async function handle(req, res) {
   if (p === '/healthz') return json(res, 200, { ok: true });
 
   // The prompt, read by assistants. The one-time code decides where the answer goes.
-  // /contribute.md is the copy for reading. The ones people paste are
-  // /u/<id>/contribute.md (the address their own page will have) and
-  // /c/<id>/contribute.md (a company page). The one-time code for the
-  // submission travels inside the prompt, not in the line people paste.
+  // The line people paste is /contribute.md?t=<code>; without a live code it
+  // is the copy for reading. /u/<id>/contribute.md?t=<code> is what lines
+  // used to look like and still works. /c/<id>/contribute.md (a company page)
+  // makes a new code on every fetch. The code goes into the prompt's submit URL.
   const md = (text) => send(res, 200, text, 'text/markdown; charset=utf-8', { 'Cache-Control': 'no-store' });
   if (p === '/llm-survey.py') return send(res, 200, MEASURE, 'text/plain; charset=utf-8', { 'Cache-Control': 'no-store' });
   if (p === '/contribute.md') {
@@ -525,10 +524,10 @@ async function handle(req, res) {
     const own = await ownProfileId(req);
     if (own) return redirect(res, `/u/${own}/contribute`);
     { const retry = limited(req, 'prompt', 30); if (retry) return tooManyRequests(res, retry); }
-    const { token, reservedId } = await store.createWait({ browser: true });
+    const { token } = await store.createWait({ browser: true });
     // An invitation link names its sender, and nothing else about them.
     const inviter = await store.profileByInvite(url.searchParams.get('from'));
-    return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, reservedId, token), inviter: inviter ? { name: inviter.name } : null }), { 'Set-Cookie': waitCookie(req, token) });
+    return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, token), inviter: inviter ? { name: inviter.name } : null }), { 'Set-Cookie': waitCookie(req, token) });
   }
 
   // A person's page.
@@ -542,7 +541,7 @@ async function handle(req, res) {
     if (prof[2] === '/contribute') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
       const { token } = await store.createWait({ profileId: profile.id });
-      return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, profile.id, token), profile }));
+      return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, token), profile }));
     }
     if (prof[2] === '/export.json') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
@@ -569,7 +568,7 @@ async function handle(req, res) {
       { const retry = limited(req, 'prompt', 30); if (retry) return tooManyRequests(res, retry); }
       if (comp[2] === '/invite' && await companyOpen(company)) return privateHtml(res, flow.companyOpenPage({ company, own: await ownProfileId(req) }));
       const wait = await companyWait(req, company);
-      const props = { company, token: wait.token, line: lineFor(req, wait.pageId, wait.token) };
+      const props = { company, token: wait.token, line: lineFor(req, wait.token) };
       if (comp[2] === '/invite') return privateHtml(res, flow.companyInvitePage({ ...props, base: baseUrl(req), code: shownCode(req, 'c', company.id) }), wait.headers);
       return privateHtml(res, flow.joinMePage(props), wait.headers);
     }
