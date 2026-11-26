@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { brandSvg, imageType, imageSide, iconLinks, simpleIconIndex, connectorBase } from '../lib/logos.js';
+import { brandSvg, imageType, imageSide, iconLinks, simpleIconIndex, connectorBase, genericIcon } from '../lib/logos.js';
 
 test('brand glyphs: only path data and a colour get into the SVG', () => {
   const svg = brandSvg('M0 0h24v24H0z', 'D97757');
@@ -47,4 +47,15 @@ test('an MCP server or connector for a product takes that product\'s logo', () =
   assert.equal(connectorBase('MCP connectors'), null);
   assert.equal(connectorBase('an internal sharing and hosting connector'), null);
   assert.equal(connectorBase('Claude Code'), null);
+});
+
+test('a tool named by a description gets a line icon for what it does', () => {
+  assert.equal(genericIcon('a browser diff viewer'), 'diff');
+  assert.equal(genericIcon('a browser automation skill'), 'globe');
+  assert.equal(genericIcon('an in-house code assistant bot'), 'bot');
+  assert.equal(genericIcon('an in-house file sharing service'), 'cloud');
+  assert.equal(genericIcon('an in-house deploy script'), 'rocket');
+  assert.equal(genericIcon('a web-analytics plugin'), 'chart');
+  assert.equal(genericIcon('a thing nobody can place'), null);
+  assert.equal(genericIcon('Browserbase'), null);
 });
