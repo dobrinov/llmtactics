@@ -421,3 +421,21 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .keep-code code { font: 600 15px var(--mono); color: var(--ink); background: #f1f5f9; padding: 2px 8px; border-radius: 6px; overflow-wrap: anywhere; }
 .keep-code .keep-note { display: block; margin-top: 6px; font-size: 13px; color: #64748b; }
 .keep-code .copy { min-height: 36px; padding: 0 14px; border: 1px solid #e2e8f0; border-radius: 999px; background: #fff; color: var(--ink); font: 600 13px var(--sans); cursor: pointer; }
+
+/* The You lens: one person's own answer, no totals (lib/tour.js, my*Slide). */
+.my-tactics { width: min(760px, 100%); margin: auto 0; }
+.my-tactics .tleg-row { cursor: pointer; }
+.my-tools { width: min(900px, 100%); margin: auto 0; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-bottom: 24px; }
+.my-tools .tool-group h2 { position: static; }
+.my-list { width: min(760px, 100%); margin: auto 0; display: flex; flex-direction: column; align-items: center; gap: 32px; }
+.my-list .chips { list-style: none; margin: 0; padding: 0; }
+.my-list .chip { cursor: default; gap: 10px; text-decoration: none; color: var(--ink); }
+.my-list a.chip { padding-left: 6px; cursor: pointer; }
+.my-list a.chip:hover { border-color: #94a3b8; }
+.my-list .chip .tc { width: 32px; height: 32px; font-size: 11px; }
+.my-list .chip small { font: 500 12px var(--mono); color: #64748b; }
+.my-earlier { width: 100%; border-top: 1px solid #e2e8f0; padding-top: 16px; }
+.my-earlier ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.my-earlier li { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 12px; }
+.my-earlier .when { font: 500 12px var(--mono); color: #64748b; padding-top: 2px; }
+.my-links { display: flex; flex-wrap: wrap; gap: 8px 24px; }

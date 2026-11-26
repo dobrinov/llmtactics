@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
 import { MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
-import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor, setLogos } from './lib/tour.js';
+import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor, setLogos, myTools } from './lib/tour.js';
 import * as flow from './lib/flow.js';
 import { numbersOf, toolDetailOf, delta } from './lib/aggregate.js';
 import { monthKey } from './lib/stats.js';
@@ -352,6 +352,9 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
       country: latest.country,
       // Whether their latest answer is in the numbers this page shows.
       counted: latest.status === 'accepted' || countIn,
+      // The answers themselves: the You slides show only these, no totals.
+      latest,
+      history,
     };
     if (acc?.owner) {
       t.again = `/u/${profile.id}/contribute`;
@@ -373,6 +376,7 @@ const linkedTools = (t) => [
   ...(t.group?.tools ?? []),
   ...[t.all, t.group].filter(Boolean).flatMap((n) => n.setups.setups.flatMap((x) => x.tools)),
   ...(t.me?.setupTools ?? []),
+  ...(t.me ? myTools(t.me) : []),
 ];
 function toolsRoute(res, t, slug) {
   t.suffix = slug ? `/tools/${slug}` : '/tools';
