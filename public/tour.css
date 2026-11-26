@@ -112,7 +112,7 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tleg-row.mine { font-weight: 700; }
 .tleg-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tleg-share { font: 500 12px var(--mono); color: #64748b; }
-.tleg-code { width: 28px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; font: 700 11px var(--sans); color: #fff; }
+.tleg-code { width: 24px; height: 24px; border-radius: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; font: 700 11px var(--sans); color: #fff; }
 .tleg-code.q0 { background: var(--q0); } .tleg-code.q1 { background: var(--q1); } .tleg-code.q2 { background: var(--q2); } .tleg-code.q3 { background: var(--q3); }
 .tleg-code.hollow { background: #fff; border-color: currentColor; } .tleg-code.hollow.q0 { color: var(--q0); } .tleg-code.hollow.q1 { color: var(--q1); } .tleg-code.hollow.q2 { color: var(--q2); } .tleg-code.hollow.q3 { color: var(--q3); }
 .tleg-row.dim .tleg-code { background: #94a3b8; border-color: transparent; color: #fff; }
