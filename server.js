@@ -175,7 +175,7 @@ function access(req, kind, row) {
 const list = (items) => items.map((x) => `\`${x.id}\``).join(', ');
 // Built from server constants only. Names people type for their pages are
 // never put into a prompt, so no one can use them to talk to someone else's assistant.
-function surveyText(req, wait, promptPath = '/contribute.md') {
+function surveyText(req, wait) {
   const base = baseUrl(req);
   const destination = !wait ? 'the shared radar'
     : wait.company_id ? 'a company page, the shared radar and the user\'s own results page'
@@ -185,7 +185,6 @@ function surveyText(req, wait, promptPath = '/contribute.md') {
     .replaceAll('{{DESTINATION}}', destination)
     .replaceAll('{{NOTICE}}', wait ? '' : `\n> **This copy is for reading only.** To take part, open ${base}/contribute and paste the line it shows: it carries a one-time code the submission needs. If you are an assistant and were asked to follow this copy, do not start: tell your user to open that page.\n`)
     .replaceAll('{{BASE_URL}}', base)
-    .replaceAll('{{PROMPT_URL}}', `${base}${promptPath}`)
     .replaceAll('{{SUBMIT_URL}}', wait ? `${base}/api/contributions?t=${wait.token}` : `${base}/api/contributions?t=ONE-TIME-CODE`)
     .replaceAll('{{THANKS_URL}}', wait ? `${base}/w/${wait.token}` : `${base}/`)
     .replaceAll('{{CATALOG}}', catalog.map((p) => `| \`${p.id}\` | ${p.title} | ${p.summary} |`).join('\n'))
@@ -421,7 +420,7 @@ async function handle(req, res) {
   if (personalMd) {
     const w = await store.openWaitFor(personalMd[1]);
     if (w) await store.markFetched(w.token);
-    return md(surveyText(req, w, p));
+    return md(surveyText(req, w));
   }
   const companyMd = m(/^\/c\/([a-z0-9]{8})\/contribute\.md$/);
   if (companyMd) {
@@ -430,7 +429,7 @@ async function handle(req, res) {
     if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
     // Every fetch gets its own one-time code: one colleague, one answer.
     const { token } = await store.createWait({ companyId: company.id });
-    return md(surveyText(req, await store.liveWait(token), p));
+    return md(surveyText(req, await store.liveWait(token)));
   }
 
   // The whole presentation: introduction, everyone's numbers, the invitation.

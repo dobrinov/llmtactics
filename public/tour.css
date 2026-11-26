@@ -190,14 +190,17 @@
 .join-inner { display: flex; flex-direction: column; align-items: center; gap: 22px; text-align: center; max-width: 880px; }
 .join-inner h2 { font: 700 clamp(36px, 5vw, 56px)/1.05 var(--head); letter-spacing: -0.03em; }
 .join-inner .lede { margin: 0; color: #64748b; font-size: 17px; }
-.join-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 300px)); gap: 16px; }
+.join-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 340px)); gap: 16px; }
 .join-card { display: flex; flex-direction: column; gap: 8px; padding: 26px; border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; text-decoration: none; color: var(--ink); text-align: left; transition: border-color 0.15s, transform 0.15s; }
 .join-card:hover { border-color: var(--ink); transform: translateY(-2px); color: var(--ink); }
 .join-card strong { font: 700 24px var(--head); }
 .join-card > span { color: #64748b; font-size: 15px; }
-.counts-in { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px; color: #64748b; opacity: 0; transition: opacity 0.15s; margin-top: 6px; }
+/* One line: a long company name is shortened rather than wrapped. */
+.counts-in { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; white-space: nowrap; min-width: 0; font-size: 13px; color: #64748b; opacity: 0; transition: opacity 0.15s; margin-top: 6px; }
 .join-card:hover .counts-in, .join-card:focus-visible .counts-in { opacity: 1; }
-.in-tag { padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+.in-tag { padding: 3px 10px; border-radius: 999px; font-weight: 600; white-space: nowrap; }
+.counts-in .in-tag { min-width: 0; padding: 3px 8px; overflow: hidden; text-overflow: ellipsis; }
+.counts-in .in-tag.all { flex: none; }
 .in-tag.all { background: var(--t0); color: #1e3a8a; } .in-tag.co { background: var(--t1); color: #7c2d12; }
 .ask { font: 500 14px var(--sans); color: #64748b; border-bottom: 1px dashed #94a3b8; cursor: help; padding: 6px 0; }
 .ask .tip { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
@@ -274,14 +277,15 @@
 .fdot.done i { background: var(--ok); }
 .fdot.on i { width: 24px; background: var(--ink); }
 .flow-stage { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px 16px; }
-.flow-step { display: flex; flex-direction: column; align-items: center; gap: 26px; text-align: center; max-width: 920px; }
+.flow-step { display: flex; flex-direction: column; align-items: center; gap: 26px; text-align: center; max-width: 1080px; }
 .flow-h { margin: 0; font: 700 clamp(32px, 4.6vw, 52px)/1.05 var(--head); letter-spacing: -0.03em; outline: none; }
 .flow-h label { cursor: inherit; }
 .flow-sub { margin: 0; font-size: 17px; line-height: 1.5; color: #64748b; max-width: 620px; }
 .flow-from { margin: 0; font-size: 15px; color: #475569; max-width: 620px; }
 .flow-line { display: flex; align-items: center; gap: 12px; max-width: 100%; padding: 8px 8px 8px 22px; border-radius: 999px; background: var(--ink); color: #e2e8f0; }
 .flow-line code { font: 500 15px var(--mono); text-align: left; overflow-wrap: anywhere; background: none; padding: 0; color: inherit; }
-.flow-line .copy { flex: none; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: #fff; color: var(--ink); font: 600 14px var(--sans); cursor: pointer; }
+/* A fixed width, so "Copied" does not push the line onto two lines. */
+.flow-line .copy { flex: none; min-width: 104px; min-height: 44px; padding: 0 20px; border: 0; border-radius: 999px; background: #fff; color: var(--ink); font: 600 14px var(--sans); cursor: pointer; }
 .flow-line.light { background: #fff; color: var(--ink); border: 1px solid #e2e8f0; }
 .flow-line.light .copy { background: var(--ink); color: #fff; }
 .flow .flow-field { min-height: 60px; width: min(440px, 100%); padding: 0 22px; border: 1px solid #cbd5e1; border-radius: 999px; background: #fff; font: 500 20px var(--sans); color: var(--ink); text-align: center; }

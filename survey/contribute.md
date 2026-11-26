@@ -10,49 +10,7 @@ Your job: look at your own history with this user, identify the recurring ways
 they work with you, show them what you found, and, only after they approve,
 submit it anonymously.
 
-Work through the steps below in order, starting with step 0.
-
-## Step 0: a word of caution first
-
-Before you read any history or run any command, show the user the message
-below exactly as written. Keep the ASCII art inside its `diff` code block
-with the `-` at the start of every line: that is what makes it show in red.
-
-```diff
-- /$$      /$$  /$$$$$$  /$$$$$$$  /$$   /$$ /$$$$$$ /$$   /$$  /$$$$$$ 
--| $$  /$ | $$ /$$__  $$| $$__  $$| $$$ | $$|_  $$_/| $$$ | $$ /$$__  $$
--| $$ /$$$| $$| $$  \ $$| $$  \ $$| $$$$| $$  | $$  | $$$$| $$| $$  \__/
--| $$/$$ $$ $$| $$$$$$$$| $$$$$$$/| $$ $$ $$  | $$  | $$ $$ $$| $$ /$$$$
--| $$$$_  $$$$| $$__  $$| $$__  $$| $$  $$$$  | $$  | $$  $$$$| $$|_  $$
--| $$$/ \  $$$| $$  | $$| $$  \ $$| $$\  $$$  | $$  | $$\  $$$| $$  \ $$
--| $$/   \  $$| $$  | $$| $$  | $$| $$ \  $$ /$$$$$$| $$ \  $$|  $$$$$$/
--|__/     \__/|__/  |__/|__/  |__/|__/  \__/|______/|__/  \__/ \______/ 
-```
-
-> You just asked me to fetch a prompt from the internet and follow it. In
-> general that is risky: a prompt like this can tell an assistant with access
-> to your machine to read files, run commands or send data somewhere, and you
-> would not see it happen. Make a habit of reading a prompt before you let an
-> assistant act on it.
->
-> **This one is fine.** It asks me to read the last 30 days of your history
-> with me, name the habits I find, check which coding tools you have and how
-> often you use them (by name only, from a fixed list), and send that to
-> {{BASE_URL}}. To count
-> and to read your prompts with secrets masked, it has me save one short
-> script, printed in the prompt, in the temporary folder and delete it at
-> the end; nothing else on your machine is changed. I won't ask anything on
-> the way. At the end I'll show you the result once, with `?` where I could
-> not find something, and you reply `yes` to send it. It sends no code,
-> names, file paths or project details. You don't need to read it to take
-> part; this is just a reminder for next time. If you'd like to anyway, it
-> is at {{PROMPT_URL}}.
->
-> **Type `go` to continue.**
-
-Then wait. Start step 1 only when the user replies `go` (or clearly says to
-continue). If they say anything else, answer it and wait for `go`; if they
-decline, stop there.
+Work through the steps below in order, starting with step 1.
 
 ## Ground rules
 
