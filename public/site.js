@@ -65,7 +65,7 @@ if (waitEl) {
       return;
     }
     const results = flowPage.querySelector('[data-flow-results]');
-    if (results && body.redirect) results.href = `${body.redirect}#habits`;
+    if (results && body.redirect) results.href = `${body.redirect}#tactics`;
     const edit = flowPage.querySelector('[data-flow-edit]');
     if (edit && body.page) { edit.href = `${body.page}/edit`; edit.hidden = false; }
     if (body.code) {
@@ -283,7 +283,7 @@ for (const card of document.querySelectorAll('.tcard[id^="h-"]')) {
 
 // The radar slide opens with its first habit selected (on a person's page, their
 // first one), and closes the card when the slide is left.
-const habits = document.getElementById('habits');
+const habits = document.getElementById('tactics');
 if (habits && document.querySelector('[data-deck]')) {
   const cards = [...habits.querySelectorAll('.tcard[id^="h-"]')];
   const first = cards.find((c) => habits.querySelector(`.hdot.mine[popovertarget="${c.id}"]`)) ?? cards[0];

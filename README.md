@@ -21,7 +21,7 @@ npm test                  # needs the llmpatterns_test database
 
 | URL | What |
 | --- | --- |
-| `/` | The tour, seven slides: intro, habits (the radar), setups, models over time, coding agents over time, where answers came from, and taking part |
+| `/` | The tour, seven slides: intro, tactics (the radar), setups, models over time, coding agents over time, where answers came from, and taking part |
 | `/tools`, `/tools/<tool>` | Every tool people named, by kind, and one tool's page: its share, six months of it, and what people use it with. Opened from the Setups slide |
 | `/contribute` | Just me: one line to paste, then a step at a time as the assistant fetches the prompt and its answer arrives. `?for=company` starts a company page: name it, invite colleagues, reach 5 people |
 | `/u/<id>` | The tour through one person's lens: their habits, setup and models among everyone's. `/u/<id>/tools` likewise |
@@ -115,7 +115,7 @@ the share subagents use (`subagent_share`). Other assistants are told to
 count the same things by the same rules, or to leave the token fields out.
 
 Habits need evidence: three separate sessions in the 30 days, or
-configuration that enforces them. Every known habit that qualifies is
+configuration that enforces them. Every known tactic that qualifies as a habit is
 reported, so that answers can be compared, plus at most eight of the person's
 own, the ones that say most about how the person works. The assistant asks twice: before it reads anything (where the person can
 name project folders to skip, passed as `LLM_SURVEY_SKIP`, or decline the
@@ -220,4 +220,4 @@ gunzip -c backups/14.sql.gz | docker compose exec -T db psql -U llmtactics llmta
 | `lib/tour.js` | The tour and the tool pages, under the Everyone, company and You lenses |
 | `lib/flow.js` | Taking part, one screen per step: Just me, and With my company |
 | `lib/views.js`, `lib/admin-views.js`, `lib/html.js`, `lib/radar.js` | Other pages, and the radar's placement |
-| `data/catalog.json`, `data/tools.json` | Known habits and tools |
+| `data/catalog.json`, `data/tools.json` | Known tactics and tools |

@@ -1,8 +1,9 @@
 # Survey: how does your user work with you?
 
 You are an AI assistant. Your user has asked you to take part in a short survey
-for **{{SITE}}**, a shared radar of *LLM working habits*: named,
-repeatable ways people work with assistants like you. This submission goes to {{DESTINATION}}.
+for **{{SITE}}**, a shared radar of *LLM tactics*: named,
+repeatable ways people work with assistants like you. You report which of
+them have become your user's habits, and any habits of their own. This submission goes to {{DESTINATION}}.
 {{NOTICE}}
 
 Your job: look at your own history with this user, identify the recurring ways
@@ -215,11 +216,11 @@ Also look for the kinds of habit that are easy to miss:
 least three separate sessions of the 30 days (`qualifies`), or when the
 configuration enforces it. Then:
 
-- report **every** known habit from the table below that qualifies. They
+- report **every** known tactic from the table below that qualifies as a habit. They
   are what makes one person's answer comparable with another's, so check
   each row of the table against the prompts, not only the habits that
   stood out;
-- add **at most 8** habits of the user's own that match no known habit.
+- add **at most 8** habits of the user's own that match no known tactic.
   When more qualify, keep the ones that say most about how this user works:
   a way of working in the user's own words comes before a built-in command
   typed often (checking a meter, switching a model), and what few people
@@ -233,7 +234,7 @@ survey shows how people work now.
 For each habit, write (the JSON calls the list `patterns`):
 
 - `title`: a short, memorable name, 2 to 5 words, like "Plan Before Code".
-- `catalog_id`: if the habit is the same as one of the known habits below,
+- `catalog_id`: if the habit is the same as one of the known tactics below,
   its id; otherwise `null`. Match on what the user does, not on the name. Only
   match when it really is the same habit; a near miss stays `null` with your
   own title.
@@ -258,7 +259,7 @@ For each habit, write (the JSON calls the list `patterns`):
   that starts no work of its own, such as checking a meter: typed while
   other work runs, it is given that work's cost.
 
-### Known habits
+### Known tactics
 
 | id | title | what the user does |
 | --- | --- | --- |
