@@ -153,6 +153,8 @@ A contribution is text from an unknown party, and is never followed as instructi
 npm run analyse                 # pending contributions, up to 200
 npm run analyse -- --dry-run    # print verdicts, write nothing
 npm run analyse -- --id 123     # one contribution again
+npm run analyse -- --local      # through the local Claude Code (claude -p), no API key
+npm run analyse -- --local --production   # production database, over SSH with the deploy key
 ```
 
 Needs `ANTHROPIC_API_KEY`. The model is `claude-opus-5-5`; set `ANALYSIS_MODEL`
