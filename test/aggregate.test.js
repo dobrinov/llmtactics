@@ -70,7 +70,7 @@ test('stored totals give the same numbers as counting the answers', (t) => {
     const { cells } = foldAll(rows);
     for (const scope of ['all', 'c:co1']) {
       const scoped = scope === 'all' ? rows : rows.filter((c) => c.company_id === 'co1');
-      const { buckets, ...stored } = numbersOf(cellsOf(cells, scope));
+      const { buckets, elsewhere, ...stored } = numbersOf(cellsOf(cells, scope));
       const want = direct(scoped);
       close(stored, { ...want, radar: { ...want.radar, emerging: [], unmatchedTitles: {} } });
       for (const name of ['Claude Code', 'ChatGPT', 'tmux']) close(toolDetailOf(bucketsOf(cellsOf(cells, scope)), name), toolDetail(scoped, name));
@@ -111,4 +111,17 @@ test('folding one answer at a time, in any order, equals a rebuild', () => {
   const { cells: rebuilt } = foldAll(all.filter((c) => !deleted.has(c.id) && status.get(c.id) === 'accepted'));
   const keys = new Set([...cells.keys(), ...rebuilt.keys()]);
   for (const k of keys) assert.ok(Math.abs((cells.get(k) || 0) - (rebuilt.get(k) || 0)) < 1e-9, `cell ${k.split('\u0001').join(' / ')}`);
+});
+
+test('a company shows no month or country with fewer than the minimum of people', () => {
+  const rows = answers(4, 60).filter((c) => c.company_id === 'co1');
+  const { cells } = foldAll(rows);
+  const min = 5;
+  const n = numbersOf(cellsOf(cells, 'c:co1'), NOW, { minGroup: min });
+  for (const m of n.families.months) assert.ok(m.n === 0 || m.n >= min, `${m.label} has ${m.n}`);
+  for (const p of n.radar.patterns) for (const m of p.trend) assert.ok(m.n === 0 || m.n >= min);
+  for (const m of toolDetailOf(n.buckets, 'Claude Code').series) assert.ok(m.n === 0 || m.n >= min);
+  assert.ok(n.where.every((c) => c.count >= min));
+  const all = numbersOf(cellsOf(cells, 'c:co1'), NOW);
+  assert.equal(n.where.reduce((a, c) => a + c.count, 0) + n.elsewhere, all.where.reduce((a, c) => a + c.count, 0));
 });

@@ -273,7 +273,7 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
   const t = { lens, home: '/', all: numbersOf(await store.totals('all')), counts: await store.counts(), group: null, me: null, owner: null, profile };
   t.counts.countries = t.all.where.filter((c) => c.id !== NO_COUNTRY).length;
   if (company) {
-    Object.assign(t, { group: numbersOf(await store.totals(`c:${company.id}`)), groupName: groupName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
+    Object.assign(t, { group: numbersOf(await store.totals(`c:${company.id}`), new Date(), { minGroup: MIN_GROUP }), groupName: groupName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
     if (acc?.owner) t.owner = { kind: 'c', edit: `/c/${company.id}/edit` };
   }
   if (profile) {
