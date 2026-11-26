@@ -134,6 +134,9 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tcard-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
 .tcard-step { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #f1f5f9; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .tcard-step:hover { background: #e2e8f0; }
+.tcard-when .label, .tcard-try .label { display: block; font-size: 11px; margin-bottom: 2px; }
+.tcard .tcard-try { padding: 10px 12px; border-radius: 12px; }
+.tcard .tcard-try p { font-size: 13px; }
 .x { width: 32px; height: 32px; flex: none; border: 0; border-radius: 50%; background: #f1f5f9; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .badge { padding: 3px 10px; border-radius: 999px; font: 600 12px var(--sans); }
 .badge.q0 { background: var(--t0); color: var(--q0); } .badge.q1 { background: var(--t1); color: var(--q1); } .badge.q2 { background: var(--t2); color: var(--q2); } .badge.q3 { background: var(--t3); color: var(--q3); }
