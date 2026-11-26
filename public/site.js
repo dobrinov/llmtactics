@@ -170,6 +170,8 @@ if (deck) {
   });
   const start = slides.findIndex((s) => `#${s.id}` === location.hash);
   if (start > 0) deck.scrollTo({ left: slides[start].offsetLeft, behavior: 'instant' });
+  if (start > 0) mark(start);
+  deck.dataset.ready = '';
 }
 
 // The world map: a country's name and its number of people follow the pointer.
