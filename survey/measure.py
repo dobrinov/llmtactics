@@ -1,4 +1,4 @@
-# Reads the last 30 days of Claude Code, Codex and Gemini CLI history, and changes nothing.
+# Reads the last 30 days of Claude Code, Codex, Gemini CLI and OpenCode history, and changes nothing.
 #   measure          totals, medians and model names: no prompt, path or project name
 #   read N           page N of the prompts the user typed, with secrets masked
 #   count RE [RE..]  for each expression, the sessions and days whose prompts match it,
@@ -15,6 +15,7 @@ day_of = lambda t: t.astimezone().date()
 root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 codex = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
 gemini = os.path.expanduser("~/.gemini")
+opencode = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "opencode", "storage")
 # Text the harness writes into the user's turn; not something the user typed.
 # Work the user keeps out of the survey: LLM_SURVEY_SKIP='name1,name2' skips every session whose
 # project folder's path holds one of the names (without case, any punctuation alike).
@@ -32,6 +33,11 @@ OPENAI_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creati
 GEMINI_2_PRICE = {"cache_read_input_tokens": 0.25, "input_tokens": 1, "cache_creation_input_tokens": 0, "output_tokens": 8}
 GEMINI_3_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 0, "output_tokens": 6}
 gemini_price = lambda model: GEMINI_2_PRICE if re.search(r"gemini-[12]\b|gemini-[12]\.", model or "") else GEMINI_3_PRICE
+
+
+def price_of(model):  # OpenCode runs any provider's models: Claude's and Gemini's go by their makers, others as OpenAI's
+    m = (model or "").lower()
+    return CLAUDE_PRICE if "claude" in m else gemini_price(m) if "gemini" in m else OPENAI_PRICE
 
 
 def when(o):
@@ -206,6 +212,37 @@ for folder in gemini_projects:
         t = when(o)
         if t:
             logged(t, o.get("sessionId"), o["message"], [], "Gemini CLI")
+
+
+# OpenCode keeps one JSON file per thing below storage/: session/<project>/<session>.json (its
+# folder, and parentID when a subagent ran it), message/<session>/<message>.json (role, time in
+# milliseconds, model) and part/<message>/<part>.json (the text, tool calls, and a "step-finish"
+# part with the tokens of each model request). Text OpenCode adds to a prompt is marked synthetic.
+def ms(value):
+    try:
+        return datetime.fromtimestamp(value / 1000, timezone.utc)
+    except (TypeError, ValueError, OverflowError, OSError):
+        return None
+
+
+opencode_files, opencode_messages = [], []  # (time, session, sub, message, parts)
+for f in glob.glob(os.path.join(opencode, "session", "*", "*.json")):
+    meta = json_file(f)
+    if not isinstance(meta, dict) or not meta.get("id") or skipped(meta.get("directory")):
+        continue
+    opencode_files.append(f)
+    sub = bool(meta.get("parentID"))
+    for g in glob.glob(os.path.join(opencode, "message", meta["id"], "*.json")):
+        m = json_file(g)
+        t = ms((m.get("time") or {}).get("created")) if isinstance(m, dict) and isinstance(m.get("time"), dict) else None
+        if not t or (sub and m.get("role") == "user"):  # a subagent's prompts are its parent's instructions
+            continue
+        parts = [x for x in (json_file(h) for h in sorted(glob.glob(os.path.join(opencode, "part", m.get("id") or "-", "*.json")))) if isinstance(x, dict)]
+        opencode_messages.append((t, meta.get("parentID") or meta["id"], sub, m, parts))
+        if m.get("role") == "user":
+            text = "".join(x.get("text") or "" for x in parts if x.get("type") == "text" and not x.get("synthetic")).strip()
+            if text and not text.startswith(NOT_TYPED):
+                logged(t, meta["id"], text, [], "OpenCode")
 log.sort(key=lambda e: e[0])
 log = [e for e in log if e[1] not in surveyed]
 log_days = sorted({day_of(e[0]) for e in log})
@@ -557,6 +594,42 @@ for folder in gemini_projects:
                 "cache_read_input_tokens": cached, "output_tokens": num("output") + num("thoughts")})
             r["seen"].add(session)
 
+# OpenCode: a prompt is a user message with typed text; each "step-finish" part is one model request,
+# and "input" there leaves out the cached tokens. Messages written before step-finish parts existed
+# carry the tokens on the message.
+for t, session, sub, m, parts in opencode_messages:
+    oldest = min(oldest, t)
+    if t < since:
+        continue
+    if m.get("role") == "user":
+        stamps[session].append(t)
+        if any(x.get("type") == "text" and not x.get("synthetic") and (x.get("text") or "").strip() for x in parts):
+            prompts[session] += 1
+            days.add(day_of(t))
+        continue
+    if m.get("role") != "assistant":
+        continue
+    if not sub:
+        stamps[session].append(t)
+    steps = [(x.get("id"), x.get("tokens")) for x in parts if x.get("type") == "step-finish"] or [(m.get("id"), m.get("tokens"))]
+    for key, k in steps:
+        k = k if isinstance(k, dict) else {}
+        cache = k.get("cache") if isinstance(k.get("cache"), dict) else {}
+        num = lambda o, key: o.get(key) if isinstance(o.get(key), int) else 0
+        r = requests.setdefault(("opencode", key), {
+            "model": m.get("modelID"), "sub": sub, "session": session, "t": t, "seen": set(), "price": price_of(m.get("modelID")),
+            "input_tokens": num(k, "input"), "cache_creation_input_tokens": num(cache, "write"),
+            "cache_read_input_tokens": num(cache, "read"), "output_tokens": num(k, "output") + num(k, "reasoning")})
+        r["seen"].add(session)
+    for x in parts:
+        i = (x.get("state") or {}).get("input") if x.get("type") == "tool" and isinstance(x.get("state"), dict) else None
+        if not isinstance(i, dict):
+            continue
+        if x.get("tool") in ("write", "edit"):
+            lines[("opencode", x.get("id"))] = sum(len(v.splitlines()) for v in (i.get("content"), i.get("newString")) if isinstance(v, str))
+        elif isinstance(i.get("patchText"), str):
+            lines[("opencode", x.get("id"))] = patch_lines(i["patchText"])
+
 reqs = [r for r in requests.values() if sum(r[p] for p in PARTS)]
 total = lambda rows, *parts: sum(r[p] for r in rows for p in (parts or PARTS))
 tokens = total(reqs) or 1
@@ -623,7 +696,7 @@ if mode == "count":
 
 worked = [s for s in prompts if prompts[s]]
 print(json.dumps({
-    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files)), ("Gemini CLI", len(gemini_files))) if n},
+    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files)), ("Gemini CLI", len(gemini_files)), ("OpenCode", len(opencode_files))) if n},
     "days_covered": covered,
     "days_with_prompts": min(len(days), covered),
     "sessions": len(worked),
