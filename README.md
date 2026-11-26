@@ -28,7 +28,7 @@ npm test                  # needs the llmpatterns_test database
 | `/c/<id>` | The tour through a company's lens, next to everyone. Until 5 people's answers have been reviewed: how many have answered. `/c/<id>/tools` likewise |
 | `/c/<id>/contribute` | The page to send to colleagues: the Just me steps, with the answer counting for the company too |
 | `/c/<id>/invite` | For the person who started the page: the link for colleagues and their own line; once 5 have answered, that the results are open |
-| `/admin` | Contributions, review, and how to run the analysis |
+| `/admin` | Contributions, review, and how to run the analysis. `/admin/totals`: whether the stored totals match the answers, and a rebuild |
 | `/u/<id>/contribute.md`, `/c/<id>/contribute.md` | The prompt assistants read (`survey/contribute.md`, filled in per request). `/contribute.md` is a copy for reading |
 
 There is no sign-up. The browser that created a page holds a signed cookie that
@@ -58,6 +58,12 @@ it, but the password only opens the page.
    something). The person's own page shows it at once.
 5. The analysis (`npm run analyse`) or the admin accepts it. Only `accepted`
    contributions count in the shared and company numbers.
+6. Every change to an answer (accepted, rejected, re-matched, deleted) updates
+   the stored totals for that one person, in the same transaction (tables
+   `aggregates` and `folded`). The tour reads only these totals. They can be
+   rebuilt from the answers at any time on `/admin/totals`, and are rebuilt on
+   start when the way answers are counted changes (`VERSION` in
+   `lib/aggregate.js`).
 
 ## What the survey measures
 
@@ -166,7 +172,8 @@ docker compose exec -T db pg_dump -U llmtactics llmtactics | gzip > backup-$(dat
 | `lib/shape.js` | Allowed values, the catalog, cleaning a submission |
 | `lib/security.js` | Password hashing, signed cookies, the injection screen |
 | `lib/analysis.js`, `scripts/analyse.js` | The analysis prompt, schema, checks and runner |
-| `lib/stats.js` | Radar shares, tools, models, setups, experience, cost |
+| `lib/stats.js` | Radar shares, tools, models, setups, experience, cost, counted from the answers |
+| `lib/aggregate.js` | The stored totals the tour reads: what one answer adds, folding one person at a time, rebuilding, and reading the numbers back |
 | `lib/tour.js` | The tour and the tool pages, under the Everyone, company and You lenses |
 | `lib/flow.js` | Taking part, one screen per step: Just me, and With my company |
 | `lib/views.js`, `lib/admin-views.js`, `lib/html.js`, `lib/radar.js` | Other pages, and the radar's placement |

@@ -125,3 +125,35 @@ CREATE INDEX IF NOT EXISTS waits_reserved ON waits(reserved_id);
 -- When an assistant first fetched the prompt, so the contribute page can show
 -- that it is at work.
 ALTER TABLE waits ADD COLUMN IF NOT EXISTS fetched_at timestamptz;
+
+-- Stored totals (lib/aggregate.js): sums the tour reads instead of counting
+-- every answer on every page view. Rebuilt from contributions at any time.
+CREATE TABLE IF NOT EXISTS aggregates (
+  scope text NOT NULL,
+  kind text NOT NULL,
+  month text NOT NULL,
+  metric text NOT NULL,
+  key text NOT NULL,
+  value double precision NOT NULL,
+  PRIMARY KEY (scope, kind, month, metric, key)
+);
+-- Which answer of each person is in the totals, and what it added.
+-- person: 'p:<profile id>', or 'c:<contribution id>' for an answer without a page.
+CREATE TABLE IF NOT EXISTS folded (
+  person text NOT NULL,
+  scope text NOT NULL,
+  kind text NOT NULL,
+  month text NOT NULL,
+  contribution_id bigint NOT NULL,
+  delta jsonb NOT NULL,
+  PRIMARY KEY (person, scope, kind, month)
+);
+CREATE INDEX IF NOT EXISTS folded_scope ON folded(scope);
+CREATE TABLE IF NOT EXISTS aggregate_state (
+  id int PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  version int NOT NULL,
+  rebuilt_at timestamptz,
+  rebuild_ms int,
+  folded_at timestamptz,
+  folds bigint NOT NULL DEFAULT 0
+);

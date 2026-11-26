@@ -6,9 +6,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
-import { radar, tools, counted, countries, MIN_GROUP, NO_COUNTRY, exactSetups, stackedShares, familyNames, versionNames, harnessNames, setupKey, devTools, toolDetail } from './lib/stats.js';
+import { counted, MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, devTools } from './lib/stats.js';
 import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
 import * as flow from './lib/flow.js';
+import { numbersOf, toolDetailOf } from './lib/aggregate.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
@@ -203,7 +204,6 @@ function surveyText(req, wait, promptPath = '/contribute.md') {
 
 // ---------- page data ----------
 
-const accepted = () => store.contributions({ status: 'accepted' });
 
 // A company's results open once MIN_GROUP people's answers have been reviewed.
 const companyOpen = async (company) => counted(await store.contributions({ companyId: company.id, status: 'accepted' })).length >= MIN_GROUP;
@@ -243,19 +243,6 @@ async function editPage(req, res, url, kind, row, acc) {
 
 // ---------- the tour ----------
 
-// Everything one lens shows, from one set of contributions.
-function lensNumbers(contribs) {
-  return {
-    radar: radar(contribs),
-    setups: exactSetups(contribs),
-    tools: tools(contribs).tools,
-    families: stackedShares(contribs, familyNames),
-    versions: stackedShares(contribs, versionNames, { top: 7 }),
-    harnesses: stackedShares(contribs, harnessNames),
-    where: countries(contribs),
-  };
-}
-
 const groupName = (company) => company.name || 'This company';
 const lastGrant = (req, prefix) => grantsOf(req).filter((g) => g.startsWith(prefix)).map((g) => g.slice(prefix.length)).at(-1);
 
@@ -279,13 +266,11 @@ async function lensesFor(req, { profile = null, company = null, who = null }) {
 // when their page has no answer yet.
 async function tourData(req, { profile = null, company = null, acc = null }) {
   const lens = profile ? 'you' : company ? 'company' : 'everyone';
-  const all = await accepted();
-  const t = { lens, home: '/', all: lensNumbers(all), counts: await store.counts(), group: null, me: null, owner: null, profile, rows: { all } };
+  // Everyone's numbers, and a company's, come from the stored totals (lib/aggregate.js).
+  const t = { lens, home: '/', all: numbersOf(await store.totals('all')), counts: await store.counts(), group: null, me: null, owner: null, profile };
   t.counts.countries = t.all.where.filter((c) => c.id !== NO_COUNTRY).length;
   if (company) {
-    const mine = await store.contributions({ companyId: company.id, status: 'accepted' });
-    Object.assign(t, { group: lensNumbers(mine), groupName: groupName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
-    t.rows.group = mine;
+    Object.assign(t, { group: numbersOf(await store.totals(`c:${company.id}`)), groupName: groupName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
     if (acc?.owner) t.owner = { kind: 'c', edit: `/c/${company.id}/edit` };
   }
   if (profile) {
@@ -329,8 +314,8 @@ function toolsRoute(res, t, slug) {
   const list = t.all.tools;
   return send(res, toolPage(t, {
     tool,
-    detail: toolDetail(t.rows.all, tool.name),
-    groupDetail: t.rows.group ? toolDetail(t.rows.group, tool.name) : null,
+    detail: toolDetailOf(t.all.buckets, tool.name),
+    groupDetail: t.group ? toolDetailOf(t.group.buckets, tool.name) : null,
     prev: list.length > 1 ? list[(at - 1 + list.length) % list.length] : null,
     next: list.length > 1 ? list[(at + 1) % list.length] : null,
   }));
@@ -537,6 +522,10 @@ async function handle(req, res) {
       return privateHtml(res, admin.listPage({ counts, rows, status, page }));
     }
     if (p === '/admin/analysis') return privateHtml(res, admin.analysisPage({ counts: await store.statusCounts(), base: baseUrl(req) }));
+    if (p === '/admin/totals') {
+      const [state, check] = await Promise.all([store.totalsState(), store.checkTotals()]);
+      return privateHtml(res, admin.totalsPage({ state, check, rebuilt: url.searchParams.has('rebuilt') }));
+    }
     const one = m(/^\/admin\/c\/(\d{1,18})$/);
     if (one) {
       const c = await store.contribution(one[1]);
@@ -628,6 +617,10 @@ async function post(req, res, url, p, m) {
   if (p === '/admin/logout') return redirect(res, '/', { 'Set-Cookie': cookie('admin', '', { maxAge: 0, secure: SECURE }) });
   if (p.startsWith('/admin/')) {
     if (!isAdmin(req)) return send(res, 403, 'Forbidden', 'text/plain');
+    if (p === '/admin/totals/rebuild') {
+      await store.rebuildTotals();
+      return redirect(res, '/admin/totals?rebuilt');
+    }
     const act = m(/^\/admin\/c\/(\d{1,18})\/(accept|reject|flag|pending|delete)$/);
     if (act) {
       const [, id, action] = act;

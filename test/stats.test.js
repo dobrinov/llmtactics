@@ -18,7 +18,7 @@ const sub = (ids, extra = {}) => cleanContribution({
 let store;
 before(async () => { store = await openDb(process.env.TEST_DATABASE_URL || 'postgres://localhost/llmpatterns_test'); });
 after(() => store.close());
-beforeEach(() => store.sql`TRUNCATE profiles, companies, contributions, waits CASCADE`);
+beforeEach(() => store.sql`TRUNCATE profiles, companies, contributions, waits, aggregates, folded CASCADE`);
 
 const add = (clean, opts = {}) => store.addContribution(clean, { status: 'accepted', ...opts });
 
@@ -193,4 +193,44 @@ test('a tool: its share, and the tools its users work with', async () => {
   assert.equal(d.share, 67);
   assert.deepEqual(d.with.map((w) => [w.name, w.share]), [['Claude Code', 50], ['Cursor', 50]]);
   assert.equal(d.series.at(-1).share, 67);
+});
+
+test('stored totals follow every change to an answer, and match a fresh count', async () => {
+  const { numbersOf } = await import('../lib/aggregate.js');
+  const ok = async (what) => {
+    const check = await store.checkTotals();
+    assert.deepEqual(check.differ, [], what);
+    assert.equal(check.folds, check.expectedFolds, what);
+  };
+  const me = await store.createProfile();
+  const co = await store.createCompany({ name: 'Co' });
+  const first = await add(sub(['plan-before-code']), { profileId: me.id, companyId: co.id });
+  await ok('an accepted answer');
+  const second = await add(sub(['clean-slate']), { profileId: me.id, status: 'pending' });
+  await ok('a pending answer changes nothing');
+  await store.setStatus(second, 'accepted');
+  await ok('accepting it');
+  let n = numbersOf(await store.totals('all'));
+  assert.equal(n.radar.total, 1);
+  assert.equal(n.radar.patterns[0].id, 'clean-slate');
+  assert.equal(numbersOf(await store.totals(`c:${co.id}`)).radar.patterns[0].id, 'plan-before-code');
+  await store.setStatus(second, 'rejected');
+  await ok('rejecting it again');
+  assert.equal(numbersOf(await store.totals('all')).radar.patterns[0].id, 'plan-before-code');
+  await store.applyAnalysis(first, { status: 'accepted', analysis: {}, patterns: [{ position: 0, catalog_id: 'clean-slate', quadrant: 'q0' }] });
+  await ok('matching a habit to another one');
+  const loose = await add(sub(['clean-slate']));
+  await store.deleteContribution(loose);
+  await ok('deleting an answer without a page');
+  await store.deleteCompany(co.id);
+  await ok('deleting the company');
+  assert.equal((await store.totals(`c:${co.id}`)).length, 0);
+  await store.deleteProfile(me.id);
+  await ok('deleting the page');
+  assert.equal((await store.totals('all')).length, 0);
+  await add(sub(['clean-slate']));
+  await store.sql`UPDATE aggregates SET value = value + 1 WHERE metric = 'n' AND kind = 'l'`;
+  assert.equal((await store.checkTotals()).differ.length, 1, 'a check notices totals that drifted');
+  await store.rebuildTotals();
+  await ok('a rebuild');
 });
