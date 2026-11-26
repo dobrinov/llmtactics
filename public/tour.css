@@ -91,6 +91,40 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tradar[data-only] [data-q] { opacity: 0.12; pointer-events: none; }
 .tradar[data-only="brief"] [data-q="brief"], .tradar[data-only="steer"] [data-q="steer"], .tradar[data-only="check"] [data-q="check"], .tradar[data-only="delegate"] [data-q="delegate"] { opacity: 1; pointer-events: auto; }
 
+/* Codes inside dots large enough to hold them (20px and up at full size), and only while the radar is wide enough to read them. */
+.hcode { display: none; font: 700 calc(var(--d) * 0.42)/1 var(--sans); color: #fff; letter-spacing: -0.02em; pointer-events: none; }
+.hdot { display: flex; align-items: center; justify-content: center; }
+.hdot.hollow .hcode { color: currentColor; }
+@container (min-width: 420px) { .hcode { display: block; } }
+.hdot.lit { transform: scale(1.25); z-index: 6; }
+
+/* The legend: on wide screens in the space left of the radar, which stays centred; below it otherwise. */
+.tradar-wrap { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 28px; margin: auto 0; }
+.tradar-wrap .tradar { margin: 0; }
+.tlegend { width: min(560px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px 24px; }
+.tleg-group ol { list-style: none; margin: 0; padding: 0; }
+.tleg-head { margin: 0 0 4px; font: 600 12px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.tleg-head.q0 { color: var(--q0); } .tleg-head.q1 { color: var(--q1); } .tleg-head.q2 { color: var(--q2); } .tleg-head.q3 { color: var(--q3); }
+.tleg-row { width: 100%; min-height: 32px; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 2px 8px 2px 2px; border: 0; border-radius: 8px; background: none; color: var(--ink); font: 500 13px/1.3 var(--sans); text-align: left; cursor: pointer; }
+.tleg-row:hover, .tleg-row.lit { background: #f1f5f9; }
+.tleg-row.on { background: #e2e8f0; }
+.tleg-row.dim { color: #94a3b8; }
+.tleg-row.mine { font-weight: 700; }
+.tleg-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tleg-share { font: 500 12px var(--mono); color: #64748b; }
+.tleg-code { width: 28px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; border: 2px solid transparent; font: 700 11px var(--sans); color: #fff; }
+.tleg-code.q0 { background: var(--q0); } .tleg-code.q1 { background: var(--q1); } .tleg-code.q2 { background: var(--q2); } .tleg-code.q3 { background: var(--q3); }
+.tleg-code.hollow { background: #fff; border-color: currentColor; } .tleg-code.hollow.q0 { color: var(--q0); } .tleg-code.hollow.q1 { color: var(--q1); } .tleg-code.hollow.q2 { color: var(--q2); } .tleg-code.hollow.q3 { color: var(--q3); }
+.tleg-row.dim .tleg-code { background: #94a3b8; border-color: transparent; color: #fff; }
+.tlegend[data-only] [data-q] { opacity: 0.25; }
+.tlegend[data-only="brief"] [data-q="brief"], .tlegend[data-only="steer"] [data-q="steer"], .tlegend[data-only="check"] [data-q="check"], .tlegend[data-only="delegate"] [data-q="delegate"] { opacity: 1; }
+@media (min-width: 1320px) {
+  .tradar-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0 40px; }
+  .tradar-wrap .tradar { grid-column: 2; grid-row: 1; width: min(560px, calc(100svh - 200px)); }
+  .tlegend { grid-column: 1; grid-row: 1; justify-self: end; width: 260px; grid-template-columns: 1fr; gap: 12px; }
+  .tleg-row { min-height: 28px; }
+}
+
 /* A habit's or a tool's details: a card at the bottom right. */
 .tcard { position: fixed; inset: auto 24px 24px auto; margin: 0; width: min(360px, calc(100vw - 32px)); max-height: calc(100svh - 120px); overflow: auto; padding: 18px; border-radius: 16px; border: 1px solid #e2e8f0; background: #fff; color: var(--text); box-shadow: 0 16px 40px rgba(15, 23, 42, 0.16); display: none; flex-direction: column; gap: 10px; }
 .tcard:popover-open { display: flex; }

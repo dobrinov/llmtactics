@@ -106,9 +106,8 @@ if (deck) {
   const dots = [...document.querySelectorAll('[data-deck-dot]')];
   const arrows = [...document.querySelectorAll('[data-deck-step]')];
   const stepOf = (a) => Number(a.dataset.deckStep);
-  // The tour's top bar names the slide, and the lens links open the same slide.
+  // The tour's top bar names the slide.
   const where = document.querySelector('[data-where]');
-  const lensLinks = [...document.querySelectorAll('[data-lens-link]')];
   // No Take part link while the Take part slide is showing.
   const joinLink = document.querySelector('.tour-join');
   const names = dots.map((d) => d.querySelector('.tip')?.textContent ?? '');
@@ -129,7 +128,6 @@ if (deck) {
     dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
     joinLink?.classList.toggle('here', slides[i].id === 'join');
     if (where) where.textContent = `${String(i + 1).padStart(2, '0')} · ${names[i]}`;
-    for (const a of lensLinks) a.href = `${a.getAttribute('href').split('#')[0]}${i ? `#${slides[i].id}` : ''}`;
     for (const a of arrows) {
       const target = i + stepOf(a);
       const off = target < 0 || target >= slides.length;
@@ -201,7 +199,21 @@ for (const radar of document.querySelectorAll('[data-tradar]')) {
     const on = radar.dataset.only === q.dataset.quad;
     if (on) delete radar.dataset.only; else radar.dataset.only = q.dataset.quad;
     for (const b of radar.querySelectorAll('[data-quad]')) b.setAttribute('aria-pressed', String(!on && b === q));
+    const legend = radar.parentElement.querySelector('[data-tlegend]');
+    if (legend) { if (on) delete legend.dataset.only; else legend.dataset.only = q.dataset.quad; }
   });
+}
+
+// The radar's legend: pointing at a row (or a dot) lights up the other one.
+for (const wrap of document.querySelectorAll('.tradar-wrap')) {
+  const light = (e, on) => {
+    const id = e.target.closest?.('.hdot, .tleg-row')?.getAttribute('popovertarget');
+    if (id) for (const el of wrap.querySelectorAll(`.hdot[popovertarget="${id}"], .tleg-row[popovertarget="${id}"]`)) el.classList.toggle('lit', on);
+  };
+  wrap.addEventListener('mouseover', (e) => light(e, true));
+  wrap.addEventListener('mouseout', (e) => light(e, false));
+  wrap.addEventListener('focusin', (e) => light(e, true));
+  wrap.addEventListener('focusout', (e) => light(e, false));
 }
 
 // A button that shows or hides the element it controls: <button data-toggle aria-controls="id">.
@@ -283,7 +295,7 @@ document.addEventListener('click', (e) => {
 });
 for (const card of document.querySelectorAll('.tcard[id^="h-"]')) {
   card.addEventListener('toggle', (e) => {
-    for (const dot of document.querySelectorAll(`.hdot[popovertarget="${card.id}"]`)) dot.classList.toggle('on', e.newState === 'open');
+    for (const dot of document.querySelectorAll(`.hdot[popovertarget="${card.id}"], .tleg-row[popovertarget="${card.id}"]`)) dot.classList.toggle('on', e.newState === 'open');
   });
 }
 
