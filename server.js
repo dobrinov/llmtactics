@@ -289,7 +289,7 @@ async function editPage(req, res, url, kind, row, acc) {
 
 const lastGrant = (req, prefix) => grantsOf(req).filter((g) => g.startsWith(prefix)).map((g) => g.slice(prefix.length)).at(-1);
 
-// The lenses this browser can switch between. Everyone, always; "You" once
+// The lenses this browser can switch between. World, always; "You" once
 // this browser owns a page of its own (the signed cookie remembers it); a
 // company once that page has answered through a company, or the browser
 // started a company page. The page being looked at is always one of them.
@@ -299,7 +299,7 @@ async function lensesFor(req, { profile = null, company = null, who = null }) {
   let co = company ?? (you ? (await store.companiesOf(you.id))[0] : null) ?? null;
   if (!co) { const id = lastGrant(req, 'oc:'); co = id ? await store.company(id) : null; }
   return [
-    { id: 'everyone', label: 'Everyone', href: '/' },
+    { id: 'everyone', label: 'World', href: '/' },
     ...(co ? [{ id: 'company', label: companyName(co), href: `/c/${co.id}` }] : []),
     ...(you ? [{ id: 'you', label: profile && who ? who.lens : 'You', href: `/u/${you.id}` }] : []),
   ];

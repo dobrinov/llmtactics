@@ -222,7 +222,7 @@ gunzip -c backups/14.sql.gz | docker compose exec -T db psql -U llmtactics llmta
 | `lib/analysis.js`, `scripts/analyse.js` | The analysis prompt, schema, checks and runner |
 | `lib/stats.js` | Radar shares, tools, models, setups, experience, cost, counted from the answers |
 | `lib/aggregate.js` | The stored totals the tour reads: what one answer adds, folding one person at a time, rebuilding, and reading the numbers back |
-| `lib/tour.js` | The tour and the tool pages, under the Everyone, company and You lenses |
+| `lib/tour.js` | The tour and the tool pages, under the World, company and You lenses |
 | `lib/flow.js` | Taking part, one screen per step: Just me, and With my company |
 | `lib/views.js`, `lib/admin-views.js`, `lib/html.js`, `lib/radar.js` | Other pages, and the radar's placement |
 | `data/catalog.json`, `data/tools.json` | Known tactics and tools |
