@@ -382,11 +382,12 @@ function toolsRoute(res, t, slug) {
   t.suffix = slug ? `/tools/${slug}` : '/tools';
   const send = privateHtml;
   if (!slug) return send(res, toolsIndexPage(t));
-  const list = t.all.tools;
+  // A company's tool pages step through its own tools only.
+  const list = t.lens === 'company' ? t.group.tools : t.all.tools;
   const at = list.findIndex((x) => toolSlug(x.name) === slug);
-  // The tour also links to tools outside everyone's current list: in a
+  // The tour also links to tools outside the lens's current list: in a
   // company's or a person's setup, or only in older answers.
-  const tool = at >= 0 ? list[at] : linkedTools(t).find((x) => toolSlug(x.name) === slug);
+  const tool = at >= 0 ? list[at] : [...t.all.tools, ...linkedTools(t)].find((x) => toolSlug(x.name) === slug);
   if (!tool) return html(res, views.notFoundPage(), 404);
   return send(res, toolPage(t, {
     tool,
