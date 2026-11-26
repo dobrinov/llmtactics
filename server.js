@@ -261,12 +261,20 @@ async function companyWait(req, company) {
   return { token, headers: own ? {} : { 'Set-Cookie': waitCookie(req, token) } };
 }
 
-// Whether this browser has answered already, onto a page of its own. Such a
-// browser is offered to run it again, never to take part.
-async function tookPart(req) {
+// When this browser last answered, onto a page of its own (null if never).
+async function lastAnswered(req) {
   const own = await ownProfileId(req);
-  return own ? (await store.contributions({ profileId: own })).length > 0 : false;
+  return own ? (await store.contributions({ profileId: own })).at(-1)?.created_at ?? null : null;
 }
+
+// Habits and tools change, and each answer covers the last 30 days: once the
+// latest answer is this old, the site asks for a new one.
+const ASK_AGAIN_AFTER = 30 * 24 * 3600_000;
+const dueAgain = (at) => Boolean(at) && Date.now() - new Date(at).getTime() >= ASK_AGAIN_AFTER;
+
+// Whether this browser has answered recently, onto a page of its own. Such a
+// browser is offered to run it again quietly, not asked to take part.
+const tookPart = async (req) => { const at = await lastAnswered(req); return Boolean(at) && !dueAgain(at); };
 
 // A person's page before its first answer.
 async function profileData(req, profile, acc) {
@@ -367,7 +375,10 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
   const own = profile ? null : t.lenses.find((l) => l.id === 'you');
   if (own) t.again = `${own.href}/contribute`;
   // On a person's own page they have answered (the tour shows only pages with an answer).
-  t.tookPart = profile && acc?.owner ? true : await tookPart(req);
+  // An answer a month old or more asks for a new one (\`t.lastAnswer\`, with \`t.again\`).
+  const last = profile && acc?.owner ? t.me.latest.created_at : await lastAnswered(req);
+  t.lastAnswer = dueAgain(last) ? last : null;
+  t.tookPart = Boolean(last) && !t.lastAnswer;
   return t;
 }
 
