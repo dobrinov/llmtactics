@@ -242,6 +242,11 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .join-card:hover { border-color: var(--ink); transform: translateY(-2px); color: var(--ink); }
 .join-card strong { font: 700 24px var(--head); }
 .join-card > span { color: #64748b; font-size: 15px; }
+/* The Explore slide: one card per lens, the one being looked at marked. */
+.join-cards.n3 { grid-template-columns: repeat(3, minmax(0, 260px)); }
+.join-card.here { border-color: var(--ink); }
+.join-card.here .counts-in { opacity: 1; }
+.in-tag.here { background: var(--ink); color: #fff; }
 /* One line: a long company name is shortened rather than wrapped. */
 .counts-in { display: flex; gap: 4px; align-items: center; flex-wrap: nowrap; white-space: nowrap; min-width: 0; font-size: 13px; color: #64748b; opacity: 0; transition: opacity 0.15s; margin-top: 6px; }
 .join-card:hover .counts-in, .join-card:focus-visible .counts-in { opacity: 1; }
@@ -320,7 +325,7 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
   .srow { grid-template-columns: 22px minmax(0, 1fr) 112px; gap: 8px; padding: 6px 8px; }
   .sbar { grid-template-columns: minmax(0, 1fr) 40px; gap: 8px; }
   .sbar strong { font-size: 15px; }
-  .join-cards { grid-template-columns: 1fr; width: 100%; }
+  .join-cards, .join-cards.n3 { grid-template-columns: 1fr; width: 100%; }
   .counts-in { opacity: 1; }
   .tool-group { grid-template-columns: minmax(0, 1fr); }
   .tool-group h2 { position: static; padding-top: 8px; }
