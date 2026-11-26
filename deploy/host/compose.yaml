@@ -1,0 +1,31 @@
+# llmtactics.com on the shared host: a shared Caddy (network `edge`) serves
+# every app and a shared Postgres (network `internal`) holds their databases,
+# backed up nightly by /opt/infra/backup.sh. See /opt/infra/README.md there.
+#
+# Lives at /opt/apps/llmtactics/compose.yaml. There is no src/ checkout: the
+# image is built from this repo's last commit, streamed over SSH by
+# deploy/ship.sh, so only committed code ever reaches the server.
+name: llmtactics
+
+services:
+  web:
+    image: llmtactics:latest
+    container_name: llmtactics-web
+    restart: unless-stopped
+    # DATABASE_URL, PUBLIC_URL, SITE_NAME, SESSION_SECRET, ADMIN_PASSWORD,
+    # TRUST_PROXY (mode 600). The health check comes from the Dockerfile.
+    env_file: .env
+    networks:
+      - edge      # reachable by the shared Caddy
+      - internal  # reaches the shared Postgres
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  edge:
+    external: true
+  internal:
+    external: true

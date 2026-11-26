@@ -12,5 +12,5 @@ COPY public public
 COPY scripts scripts
 USER node
 EXPOSE 4400
-HEALTHCHECK --interval=30s --timeout=3s --start-period=60s CMD wget -qO- http://127.0.0.1:4400/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --start-interval=2s CMD wget -qO- http://127.0.0.1:4400/healthz || exit 1
 CMD ["node", "server.js"]

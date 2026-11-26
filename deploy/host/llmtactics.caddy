@@ -1,0 +1,11 @@
+# llmtactics.com on the shared Caddy. Lives at
+# /opt/infra/caddy/conf.d/llmtactics.caddy; `import common` (from the main
+# Caddyfile there) adds compression, HSTS and drops the Server header.
+www.llmtactics.com {
+	redir https://llmtactics.com{uri} permanent
+}
+
+llmtactics.com {
+	import common
+	reverse_proxy llmtactics-web:4400
+}
