@@ -355,6 +355,9 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
   // A browser with a page of its own runs the survey again onto it.
   const own = profile ? null : t.lenses.find((l) => l.id === 'you');
   if (own) t.again = `${own.href}/contribute`;
+  // Whether this browser has answered already, onto a page of its own: then
+  // the tour offers to run it again rather than to take part.
+  t.tookPart = profile ? Boolean(acc?.owner) : own ? (await store.contributions({ profileId: own.href.slice(3) })).length > 0 : false;
   return t;
 }
 
