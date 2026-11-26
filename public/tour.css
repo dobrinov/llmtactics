@@ -216,6 +216,13 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 /* Links in an open tip can be clicked; a hidden tip lets clicks through. */
 .ask:hover > .tip, .ask:focus-within > .tip { pointer-events: auto; }
 .foot-line a { color: inherit; }
+/* What the pasted prompt does: a bulleted tip, a bold lead on each point,
+   the links to the prompt and its script below. */
+.tip.does { width: min(380px, calc(100vw - 32px)); padding: 12px 14px; }
+.does ul { margin: 0 0 10px; padding: 0; list-style: none; display: grid; gap: 7px; }
+.does li { position: relative; padding-left: 14px; color: #cbd5e1; }
+.does li::before { content: ''; position: absolute; left: 0; top: 0.6em; width: 5px; height: 5px; border-radius: 50%; background: #5eead4; }
+.does b { color: #fff; font-weight: 700; }
 
 /* ---------- tool pages ---------- */
 /* clip, not hidden: a hidden tip can never widen the page, and the sticky bar keeps working. */
