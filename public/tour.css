@@ -153,6 +153,7 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tc.k-multiplexer, i.k-multiplexer { background: #b03a0b; } .tc.k-review, i.k-review { background: #0f6b64; } .tc.k-connector, i.k-connector { background: #a16207; }
 .tc.k-chat, i.k-chat { background: #475569; } .tc.k-other, i.k-other { background: #64748b; }
 .tc.dim { background: #fff; color: #64748b; border: 2px dashed #94a3b8; }
+.tc.on { outline: 2px solid var(--ink); outline-offset: 2px; position: relative; z-index: 1; }
 .tc.logo { background: #fff; }
 .tc.logo > img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .tc.logo.raster { background: #e8ecf1; box-shadow: inset 0 0 0 1px #d3dae3; }

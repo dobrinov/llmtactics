@@ -305,6 +305,44 @@ for (const card of document.querySelectorAll('.tcard[id^="h-"]')) {
   });
 }
 
+// A tool's card opens beside the logo that was selected (the same tool can
+// appear in several setups, so it follows the one clicked): below it when
+// there is more room there, above it otherwise, kept inside the window. On a
+// phone it stays a sheet along the bottom (tour.css).
+{
+  let anchor = null;
+  let open = null;
+  const wide = () => innerWidth > 760;
+  const place = () => {
+    if (!open) return;
+    const s = open.style;
+    s.inset = s.top = s.bottom = s.left = s.maxHeight = '';
+    if (!anchor?.isConnected || !wide()) return;
+    const r = anchor.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) { open.hidePopover(); return; }
+    const gap = 10, edge = 16;
+    const below = innerHeight - r.bottom, above = r.top;
+    s.inset = 'auto';
+    if (below >= above) { s.top = `${r.bottom + gap}px`; s.maxHeight = `${below - gap - edge}px`; }
+    else { s.bottom = `${innerHeight - r.top + gap}px`; s.maxHeight = `${above - gap - edge}px`; }
+    const w = open.offsetWidth;
+    s.left = `${Math.max(edge, Math.min(innerWidth - w - edge, r.left + r.width / 2 - w / 2))}px`;
+  };
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[popovertarget^="tp-"]');
+    if (btn && !btn.closest('.tcard')) anchor = btn;
+  });
+  for (const card of document.querySelectorAll('.tcard[id^="tp-"]')) {
+    card.addEventListener('beforetoggle', (e) => {
+      if (e.newState === 'open') { open = card; requestAnimationFrame(place); }
+      else if (open === card) { open = null; anchor?.classList.remove('on'); }
+    });
+    card.addEventListener('toggle', (e) => { if (e.newState === 'open' && open === card) anchor?.classList.add('on'); });
+  }
+  addEventListener('resize', place);
+  addEventListener('scroll', place, { capture: true, passive: true });
+}
+
 // The radar slide opens with its first habit selected (on a person's page, their
 // first one), and closes the card when the slide is left.
 const habits = document.getElementById('tactics');
