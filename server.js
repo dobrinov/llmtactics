@@ -526,6 +526,20 @@ async function handle(req, res) {
   if (logoAt) return serveLogo(res, logoAt[1]);
   if (p === '/healthz') return json(res, 200, { ok: true });
 
+  // For search engines: the sitemap lists only the shared pages. robots.txt
+  // blocks nothing, because assistants that honour it fetch the prompt under
+  // /contribute.md, /u/ and /c/; the private pages say noindex instead.
+  if (/^\/(u|c|w|samodidopipatuk)(\/|$)|^\/contribute$/.test(p)) res.setHeader('X-Robots-Tag', 'noindex');
+  if (p === '/robots.txt') {
+    return send(res, 200, `User-agent: *\nAllow: /\n\nSitemap: ${baseUrl(req)}/sitemap.xml\n`, 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=3600' });
+  }
+  if (p === '/sitemap.xml') {
+    const t = await tourData(req, {});
+    const paths = ['/', '/tools', ...t.all.tools.map((x) => `/tools/${toolSlug(x.name)}`), '/privacy'];
+    const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${paths.map((x) => `  <url><loc>${baseUrl(req)}${x}</loc></url>`).join('\n')}\n</urlset>\n`;
+    return send(res, 200, body, 'application/xml; charset=utf-8', { 'Cache-Control': 'public, max-age=3600' });
+  }
+
   // The prompt, read by assistants. The one-time code decides where the answer goes.
   // The line people paste is /contribute.md?t=<code>; without a live code it
   // is the copy for reading. /u/<id>/contribute.md?t=<code> is what lines
