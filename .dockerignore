@@ -5,3 +5,4 @@ node_modules
 deploy
 test
 *.png
+!public/og.png
