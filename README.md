@@ -79,6 +79,14 @@ history: people change tools and ways of working within months, and Claude
 Code deletes transcripts after about 30 days anyway. The charts over time
 come from answers arriving month after month, not from anyone's old history.
 
+The headline numbers (the radar, setups, tool shares) count each person's
+latest answer, weighted by its age: full weight for three months, then half
+as much every three months. Anything whose weight adds up to less than a
+quarter of one fresh answer is no longer shown, so a tactic or tool only one
+person named fades out after about nine months unless someone names it again.
+Numbers of people stay whole; only shares and order use the weights
+(`ageWeight` in `lib/stats.js`).
+
 Within the 30 days the assistant counts instead of sampling. The prompt
 points to a script, `survey/measure.py` (served at `/llm-survey.py`, so the
 prompt stays short enough for a fetch tool to return whole), that

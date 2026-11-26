@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../lib/db.js';
 import { cleanContribution, PROMPT_RANGES } from '../lib/shape.js';
-import { tailRange, medianRange, radar, tools, experience, counted, percentile, exactSetups, stackedShares, familyNames, toolDetail, setupKey } from '../lib/stats.js';
+import { tailRange, medianRange, radar, tools, experience, counted, percentile, ageWeight, exactSetups, stackedShares, familyNames, toolDetail, setupKey } from '../lib/stats.js';
 
 const sub = (ids, extra = {}) => cleanContribution({
   assistant: 'Claude Code',
@@ -115,18 +115,32 @@ test('an analysis result is written to the contribution and its habits', async (
   assert.equal(c.analysis.verdict, 'accept');
 });
 
-test('headline numbers count recent answers, unless there are too few of them', async () => {
-  const old = new Date(Date.now() - 300 * 864e5);
-  for (let i = 0; i < 30; i++) await add(sub(['blind-accept']), { createdAt: old });
-  for (let i = 0; i < 10; i++) await add(sub(['plan-before-code']));
-  // Only 10 recent answers: everyone counts.
+test('older answers count for less, and fade out unless someone answers again', async () => {
+  const ago = (days) => new Date(Date.now() - days * 864e5);
+  for (let i = 0; i < 4; i++) await add(sub(['blind-accept']), { createdAt: ago(200) });
+  await add(sub(['clean-slate']), { createdAt: ago(330) });
+  for (let i = 0; i < 2; i++) await add(sub(['plan-before-code']));
   let r = radar(await store.contributions({ status: 'accepted' }));
-  assert.equal(r.total, 40);
-  for (let i = 0; i < 10; i++) await add(sub(['plan-before-code']));
-  // 20 recent answers: the old ones no longer shape the shares.
+  // Everyone is a person in the numbers, but the shares lean on the fresh answers.
+  assert.equal(r.total, 7);
+  const share = (id) => r.patterns.find((p) => p.id === id)?.share;
+  assert.ok(share('plan-before-code') > share('blind-accept'), 'two fresh answers outweigh four from half a year ago');
+  assert.ok(share('blind-accept') > 0);
+  // An answer from almost a year ago, that nobody repeated, has faded out.
+  assert.equal(share('clean-slate'), undefined);
+  // One fresh answer brings it back.
+  await add(sub(['clean-slate']));
   r = radar(await store.contributions({ status: 'accepted' }));
-  assert.equal(r.total, 20);
-  assert.deepEqual(r.patterns.map((p) => [p.id, p.share]), [['plan-before-code', 100]]);
+  assert.ok(share('clean-slate') > 0);
+});
+
+test('the weight of an answer by its age in months', () => {
+  const now = new Date('2026-11-26T00:00:00Z');
+  assert.equal(ageWeight('2026-11', now), 1);
+  assert.equal(ageWeight('2026-09', now), 1);
+  assert.equal(ageWeight('2026-06', now), 0.5);
+  assert.equal(ageWeight('2026-03', now), 0.25);
+  assert.ok(ageWeight('2025-11', now) < 0.25);
 });
 
 test('token measurements: the cost split, the context and subagents, from those who measured', async () => {
