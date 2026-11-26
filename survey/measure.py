@@ -1,9 +1,9 @@
-# Reads the last 30 days of Claude Code and Codex history, and changes nothing.
+# Reads the last 30 days of Claude Code, Codex and Gemini CLI history, and changes nothing.
 #   measure          totals, medians and model names: no prompt, path or project name
 #   read N           page N of the prompts the user typed, with secrets masked
 #   count RE [RE..]  for each expression, the sessions and days whose prompts match it,
 #                    and the frequency, status and cost to report
-import glob, json, os, re, statistics, sys
+import glob, hashlib, json, os, re, statistics, sys
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -14,6 +14,7 @@ since = datetime.combine(date.today() - timedelta(days=DAYS - 1), time.min).asti
 day_of = lambda t: t.astimezone().date()
 root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 codex = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
+gemini = os.path.expanduser("~/.gemini")
 # Text the harness writes into the user's turn; not something the user typed.
 # Work the user keeps out of the survey: LLM_SURVEY_SKIP='name1,name2' skips every session whose
 # project folder's path holds one of the names (without case, any punctuation alike).
@@ -27,6 +28,10 @@ PARTS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens
 # Claude model, and for every OpenAI model Codex uses, which bills no cache writes.
 CLAUDE_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 1.25, "output_tokens": 5}
 OPENAI_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 0, "output_tokens": 8}
+# Gemini 2.5 bills cached input at a quarter and output at 8 times; Gemini 3 at a tenth and 6 times.
+GEMINI_2_PRICE = {"cache_read_input_tokens": 0.25, "input_tokens": 1, "cache_creation_input_tokens": 0, "output_tokens": 8}
+GEMINI_3_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 0, "output_tokens": 6}
+gemini_price = lambda model: GEMINI_2_PRICE if re.search(r"gemini-[12]\b|gemini-[12]\.", model or "") else GEMINI_3_PRICE
 
 
 def when(o):
@@ -141,6 +146,7 @@ def logged(t, session, display, pastes, tool):
     log.append((t, session, display, pastes, texts, tool))
 
 
+claude_projects = set()
 try:
     for line in open(os.path.join(root, "history.jsonl"), errors="ignore"):
         try:
@@ -150,6 +156,8 @@ try:
             continue
         if not isinstance(o.get("display"), str) or skipped(o.get("project")):
             continue
+        if isinstance(o.get("project"), str):
+            claude_projects.add(o["project"])
         pastes = [v.get("content") for v in (o.get("pastedContents") or {}).values() if isinstance(v, dict)]
         logged(t, o.get("sessionId"), o["display"], pastes, "Claude Code")
 except OSError:
@@ -165,6 +173,39 @@ for line in lines_of(os.path.join(codex, "history.jsonl")):
     if not isinstance(text, str) or not text.strip() or text.lstrip().startswith(NOT_TYPED) or skipped(codex_cwd.get(o.get("session_id"))):
         continue
     logged(t, o.get("session_id"), text, [], "Codex CLI")
+
+
+# Gemini CLI keeps a folder per project below tmp/: logs.json, every prompt typed, and chats/, one
+# file per session. The folder is named after the project, or after the SHA-256 of its path, which
+# is matched against the folders the other tools name. When folders are skipped, a project that
+# cannot be named is skipped too: it could be one of them.
+def json_file(path):
+    try:
+        return json.load(open(path, errors="ignore"))
+    except (OSError, ValueError):
+        return None
+
+
+known = claude_projects | set(codex_cwd.values()) | {os.getcwd()}
+by_hash = {hashlib.sha256(x.encode()).hexdigest(): x for x in known if x}
+gemini_projects = {}  # folder -> the project's path or name, None when it cannot be told
+for folder in glob.glob(os.path.join(gemini, "tmp", "*", "")):
+    folder = folder.rstrip(os.sep)
+    base = os.path.basename(folder)
+    root_file = os.path.join(folder, ".project_root")
+    named = open(root_file, errors="ignore").read().strip() if os.path.isfile(root_file) else None
+    gemini_projects[folder] = named or (by_hash.get(base) if re.fullmatch(r"[0-9a-f]{64}", base) else base)
+gemini_skipped = lambda folder: bool(SKIP) and (gemini_projects.get(folder) is None or skipped(gemini_projects[folder]))
+for folder in gemini_projects:
+    entries = json_file(os.path.join(folder, "logs.json"))
+    if gemini_skipped(folder) or not isinstance(entries, list):
+        continue
+    for o in entries:
+        if not isinstance(o, dict) or o.get("type") != "user" or not isinstance(o.get("message"), str) or not o["message"].strip():
+            continue
+        t = when(o)
+        if t:
+            logged(t, o.get("sessionId"), o["message"], [], "Gemini CLI")
 log.sort(key=lambda e: e[0])
 log = [e for e in log if e[1] not in surveyed]
 log_days = sorted({day_of(e[0]) for e in log})
@@ -460,6 +501,62 @@ for path in codex_files:
                     pass
                 lines[("codex", p.get("call_id") or o.get("timestamp"))] = patch_lines(body)
 
+
+def gemini_text(content):
+    if isinstance(content, str):
+        return content
+    parts = content if isinstance(content, list) else [content]
+    return "".join(x.get("text") or "" if isinstance(x, dict) else x if isinstance(x, str) else "" for x in parts)
+
+
+# Gemini CLI: a session file is {"sessionId", "messages": [...]}. A "user" message is a prompt, or a
+# command's output when it starts with "/"; a "gemini" message is one model reply, with its tokens:
+# "input" holds "cached", and "thoughts" are billed as output. Checkpoints saved with /chat are
+# copies kept elsewhere, and a reply is counted once by its id.
+gemini_files, gemini_prompts = [], set()
+for folder in gemini_projects:
+    if gemini_skipped(folder):
+        continue
+    for path in glob.glob(os.path.join(folder, "chats", "session-*.json")):
+        gemini_files.append(path)
+        record = json_file(path)
+        if not isinstance(record, dict) or not isinstance(record.get("messages"), list):
+            continue
+        session = record.get("sessionId") or path
+        for m in record["messages"]:
+            if not isinstance(m, dict):
+                continue
+            t = when(m)
+            if not t:
+                continue
+            oldest = min(oldest, t)
+            if t < since:
+                continue
+            if m.get("type") == "user":
+                stamps[session].append(t)
+                text = gemini_text(m.get("content")).strip()
+                key = m.get("id") or (m.get("timestamp"), text)
+                if text and not text.startswith(("/", "<")) and key not in gemini_prompts:
+                    gemini_prompts.add(key)
+                    prompts[session] += 1
+                    days.add(day_of(t))
+            if m.get("type") != "gemini":
+                continue
+            stamps[session].append(t)
+            for call in m.get("toolCalls") or []:
+                a = call.get("args") if isinstance(call, dict) and isinstance(call.get("args"), dict) else {}
+                if call.get("name") in ("write_file", "replace", "edit"):
+                    lines[("gemini", call.get("id") or m.get("id"))] = sum(
+                        len(x.splitlines()) for x in (a.get("content"), a.get("new_string")) if isinstance(x, str))
+            k = m.get("tokens") if isinstance(m.get("tokens"), dict) else {}
+            num = lambda key: k.get(key) if isinstance(k.get(key), int) else 0
+            cached = min(num("cached"), num("input"))
+            r = requests.setdefault(("gemini", m.get("id") or m.get("timestamp")), {
+                "model": m.get("model"), "sub": False, "session": session, "t": t, "seen": set(), "price": gemini_price(m.get("model")),
+                "input_tokens": num("input") - cached + num("tool"), "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": cached, "output_tokens": num("output") + num("thoughts")})
+            r["seen"].add(session)
+
 reqs = [r for r in requests.values() if sum(r[p] for p in PARTS)]
 total = lambda rows, *parts: sum(r[p] for r in rows for p in (parts or PARTS))
 tokens = total(reqs) or 1
@@ -526,7 +623,7 @@ if mode == "count":
 
 worked = [s for s in prompts if prompts[s]]
 print(json.dumps({
-    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files))) if n},
+    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files)), ("Gemini CLI", len(gemini_files))) if n},
     "days_covered": covered,
     "days_with_prompts": min(len(days), covered),
     "sessions": len(worked),
