@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { brandSvg, imageType, imageSide, iconLinks, simpleIconIndex } from '../lib/logos.js';
+import { brandSvg, imageType, imageSide, iconLinks, simpleIconIndex, connectorBase } from '../lib/logos.js';
 
 test('brand glyphs: only path data and a colour get into the SVG', () => {
   const svg = brandSvg('M0 0h24v24H0z', 'D97757');
@@ -38,4 +38,13 @@ test('Simple Icons are found by title and alias, in any case', () => {
   assert.equal(index.get('claude code').slug, 'claudecode');
   assert.equal(index.get('cc').slug, 'claudecode');
   assert.equal(index.has('bad'), false);
+});
+
+test('an MCP server or connector for a product takes that product\'s logo', () => {
+  assert.equal(connectorBase('Figma MCP'), 'Figma');
+  assert.equal(connectorBase('Slack connector'), 'Slack');
+  assert.equal(connectorBase('GitHub MCP server'), 'GitHub');
+  assert.equal(connectorBase('MCP connectors'), null);
+  assert.equal(connectorBase('an internal sharing and hosting connector'), null);
+  assert.equal(connectorBase('Claude Code'), null);
 });
