@@ -5,7 +5,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
-import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
+import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS, knownTools } from './lib/shape.js';
 import { MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
 import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor, setLogos, myTools } from './lib/tour.js';
 import * as flow from './lib/flow.js';
@@ -224,6 +224,7 @@ function surveyText(req, wait) {
     .replaceAll('{{SUBMIT_URL}}', wait ? `${base}/api/contributions?t=${wait.token}` : `${base}/api/contributions?t=ONE-TIME-CODE`)
     .replaceAll('{{THANKS_URL}}', wait ? `${base}/w/${wait.token}` : `${base}/`)
     .replaceAll('{{CATALOG}}', catalog.map((p) => `| \`${p.id}\` | ${p.title} | ${p.summary} |`).join('\n'))
+    .replaceAll('{{TOOLS}}', knownTools.map((t) => `| ${t.name} | ${t.about} |`).join('\n'))
     .replaceAll('{{PURPOSES}}', list(PURPOSES))
     .replaceAll('{{PROMPT_RANGES}}', list(PROMPT_RANGES))
     .replaceAll('{{MONTH_RANGES}}', list(MONTH_RANGES))

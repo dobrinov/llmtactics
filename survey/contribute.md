@@ -351,6 +351,13 @@ internal, home-made or built by the user generically ("an in-house deploy
 script", "a private diff viewer") without its real name, even if it is
 published: the name would say what the user works on.
 
+These are public products. When the user uses one of them, give it by the
+name in this table, however it was installed or launched:
+
+| name | what it is |
+| --- | --- |
+{{TOOLS}}
+
 Then list the models that did the work, as `models`, using these ids:
 {{MODELS}}. Take them from the token counts (`models_pct_of_tokens` in the
 script's output): every model and version with at least 5% of the 30 days'
