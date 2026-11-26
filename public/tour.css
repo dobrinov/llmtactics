@@ -330,3 +330,11 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
   .flow-line .copy { width: 100%; }
   .flow-step { gap: 20px; }
 }
+
+/* On a phone the tool page's arrows would sit over its content: they become a
+   pager in the top bar's right corner, above the bar, and stay there on scroll. */
+@media (max-width: 760px) {
+  .tools-page .tour-side { top: 8px; margin-top: 0; width: 44px; height: 44px; z-index: 21; }
+  .tools-page .tour-side.prev { left: auto; right: 68px; } .tools-page .tour-side.next { right: 16px; }
+  .tools-page .tour-side .tip { display: none; }
+}
