@@ -161,3 +161,5 @@ CREATE TABLE IF NOT EXISTS aggregate_state (
   folded_at timestamptz,
   folds bigint NOT NULL DEFAULT 0
 );
+-- The version names the data it was counted with too (lib/aggregate.js).
+ALTER TABLE aggregate_state ALTER COLUMN version TYPE text;
