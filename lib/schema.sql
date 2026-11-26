@@ -168,3 +168,14 @@ CREATE TABLE IF NOT EXISTS aggregate_state (
 );
 -- The version names the data it was counted with too (lib/aggregate.js).
 ALTER TABLE aggregate_state ALTER COLUMN version TYPE text;
+
+-- Logos for the tools people name, found by `npm run analyse` (lib/logos.js).
+-- name: the tool's name in lower case. A row without a body records that
+-- nothing was found, so the search is tried again only after a while.
+CREATE TABLE IF NOT EXISTS tool_logos (
+  name text PRIMARY KEY,
+  content_type text,
+  body bytea,
+  source text,
+  checked_at timestamptz NOT NULL DEFAULT now()
+);

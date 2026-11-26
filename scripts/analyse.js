@@ -6,6 +6,14 @@
 //   npm run analyse -- --id 123      one contribution again, whatever its status
 //   npm run analyse -- --local       ask the local Claude Code (`claude -p`) instead of the API
 //   npm run analyse -- --production  work on the production database, through SSH
+//   npm run analyse -- --logos-only  only look for tool logos, analyse nothing
+//   npm run analyse -- --all-logos   look for every tool's logo again, found ones too
+//   npm run analyse -- --no-logos    analyse only
+//
+// After the contributions, it looks for a logo for each tool named in answers
+// that are not rejected (lib/logos.js): from Simple Icons, or from the tool's
+// own site. Tools with none keep their two letters on the site. A search that
+// found nothing is tried again after 30 days.
 //
 // --production reaches the server's database through an SSH tunnel with the
 // deploy key (scripts/production-db.js), so only someone who can SSH to the
@@ -26,6 +34,7 @@ import { openDb } from '../lib/db.js';
 import { VERSION as TOTALS_VERSION } from '../lib/aggregate.js';
 import { openProductionTunnel } from './production-db.js';
 import { SYSTEM, SCHEMA, userMessage, decide } from '../lib/analysis.js';
+import { loadSimpleIcons, findLogo } from '../lib/logos.js';
 
 const args = process.argv.slice(2);
 const flag = (name) => args.includes(name);
@@ -34,9 +43,12 @@ const dryRun = flag('--dry-run');
 const local = flag('--local');
 const production = flag('--production');
 const limit = Number(value('--limit')) || 200;
+const logosOnly = flag('--logos-only');
+const logos = !flag('--no-logos');
+const allLogos = flag('--all-logos');
 const MODEL = process.env.ANALYSIS_MODEL || 'claude-opus-5-5';
 
-const client = local ? null : new Anthropic();
+const client = local || logosOnly ? null : new Anthropic();
 let tunnel = null;
 let store;
 if (production) {
@@ -97,13 +109,15 @@ async function classify(c) {
 }
 
 let todo;
-if (value('--id')) {
+if (logosOnly) {
+  todo = [];
+} else if (value('--id')) {
   const one = await store.contribution(value('--id'));
   todo = one ? [one] : [];
 } else {
   todo = await store.unanalysed(limit);
 }
-console.log(`${todo.length} to analyse with ${MODEL}${local ? ' through the local Claude Code' : ''}${production ? ', on PRODUCTION' : ''}${dryRun ? ' (dry run)' : ''}`);
+if (!logosOnly) console.log(`${todo.length} to analyse with ${MODEL}${local ? ' through the local Claude Code' : ''}${production ? ', on PRODUCTION' : ''}${dryRun ? ' (dry run)' : ''}`);
 
 const tally = { accepted: 0, rejected: 0, flagged: 0, failed: 0 };
 for (const c of todo) {
@@ -135,7 +149,32 @@ for (const c of todo) {
     }
   }
 }
-console.log(`Done: ${tally.accepted} accepted, ${tally.rejected} rejected, ${tally.flagged} flagged for review, ${tally.failed} failed.`);
+if (!logosOnly) console.log(`Done: ${tally.accepted} accepted, ${tally.rejected} rejected, ${tally.flagged} flagged for review, ${tally.failed} failed.`);
+
+// ---------- tool logos ----------
+if (logos) await findLogos();
+
+async function findLogos() {
+  let names;
+  try {
+    names = await store.logosToFind({ all: allLogos });
+  } catch (e) {
+    // 42P01: no such table. The server creates it on start, so this database runs older code.
+    if (e.code === '42P01') return console.error('Logos: this database has no tool_logos table yet. Deploy this code first, then run again with --logos-only.');
+    throw e;
+  }
+  if (!names.length) return console.log('Logos: none to look for.');
+  let icons = null;
+  try { icons = await loadSimpleIcons(); } catch (e) { console.error(`Logos: Simple Icons could not be read (${e.message}); only tools' own sites are tried.`); }
+  let found = 0;
+  for (const name of names) {
+    const logo = await findLogo(name, { icons });
+    if (logo) found++;
+    console.log(`logo  ${name.padEnd(28)}  ${logo ? `${logo.source} (${Math.ceil(logo.body.length / 1024)} KB)` : 'none, keeps its letters'}`);
+    if (!dryRun) await store.saveLogo(name, logo);
+  }
+  console.log(`Logos: ${found} of ${names.length} found${dryRun ? ' (dry run, nothing saved)' : ''}.`);
+}
 await store.close();
 tunnel?.close();
 process.exit(tally.failed ? 1 : 0);

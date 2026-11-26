@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
 import { MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
-import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
+import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor, setLogos } from './lib/tour.js';
 import * as flow from './lib/flow.js';
 import { numbersOf, toolDetailOf, delta } from './lib/aggregate.js';
 import { monthKey } from './lib/stats.js';
@@ -395,6 +395,27 @@ function toolsRoute(res, t, slug) {
 
 setInterval(() => store.pruneWaits().catch(() => {}), 3600_000).unref();
 
+// Tool logos (table tool_logos): the analysis script finds them, so the list is
+// read again every few minutes. Tools without one keep their two letters.
+let logoBySlug = new Map();
+async function loadLogos() {
+  const rows = await store.logoIndex();
+  logoBySlug = new Map(rows.map((r) => [toolSlug(r.name), r.name]));
+  setLogos(rows);
+}
+await loadLogos().catch((e) => console.error(`Tool logos not loaded: ${e.message}`));
+setInterval(() => loadLogos().catch(() => {}), 5 * 60_000).unref();
+// A logo is served with a policy that runs nothing, should it be opened on its own.
+async function serveLogo(res, slug) {
+  const name = logoBySlug.get(slug);
+  const logo = name ? await store.logo(name) : null;
+  if (!logo) return send(res, 404, 'Not found', 'text/plain');
+  return send(res, 200, logo.body, logo.content_type, {
+    'Cache-Control': 'public, max-age=31536000, immutable',
+    'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+  });
+}
+
 // Where a finished wait leads. The first browser that asks gets the owner grant
 // for the new page; anyone else is sent to the page itself (which may ask for its password).
 // `fetched`: the assistant has fetched the prompt and is at work. `code`: the
@@ -481,6 +502,8 @@ async function handle(req, res) {
 
   if (p.startsWith('/static/')) return serveStatic(res, p.slice('/static/'.length));
   if (p === '/favicon.ico') return serveStatic(res, 'favicon.svg');
+  const logoAt = m(/^\/logos\/([a-z0-9-]{1,80})$/);
+  if (logoAt) return serveLogo(res, logoAt[1]);
   if (p === '/healthz') return json(res, 200, { ok: true });
 
   // The prompt, read by assistants. The one-time code decides where the answer goes.

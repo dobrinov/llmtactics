@@ -61,6 +61,10 @@ it, but the password only opens the page.
    something). The person's own page shows it at once.
 5. The analysis (`npm run analyse`) or the admin accepts it. Only `accepted`
    contributions count in the shared and company numbers.
+   The same run looks for a logo for every tool named in answers (table
+   `tool_logos`, `lib/logos.js`): a Simple Icons glyph, or the icon of the
+   tool's own site. The site shows it in place of the tool's two letters,
+   which stay for tools with no logo. `--logos-only` runs just this step.
 6. Every change to an answer (accepted, rejected, re-matched, deleted) updates
    the stored totals for that one person, in the same transaction (tables
    `aggregates` and `folded`). The tour reads only these totals. They can be
