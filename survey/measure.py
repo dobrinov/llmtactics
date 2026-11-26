@@ -14,6 +14,11 @@ since = datetime.combine(date.today() - timedelta(days=DAYS - 1), time.min).asti
 day_of = lambda t: t.astimezone().date()
 root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
 # Text the harness writes into the user's turn; not something the user typed.
+# Work the user keeps out of the survey: LLM_SURVEY_SKIP='name1,name2' skips every session whose
+# project folder's path holds one of the names (without case, any punctuation alike).
+norm = lambda s: re.sub(r"[^a-z0-9]+", "-", (s or "").lower())
+SKIP = [norm(x).strip("-") for x in os.environ.get("LLM_SURVEY_SKIP", "").split(",") if x.strip()]
+skipped = lambda where: any(s and s in norm(where) for s in SKIP)
 NOT_TYPED = ("<task-notification", "<system-reminder", "<local-command", "<command-", "<bash-")
 PARTS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
 
@@ -91,7 +96,7 @@ try:
             t = datetime.fromtimestamp(o["timestamp"] / 1000, timezone.utc)
         except (ValueError, KeyError, TypeError):
             continue
-        if not isinstance(o.get("display"), str):
+        if not isinstance(o.get("display"), str) or skipped(o.get("project")):
             continue
         pastes = [v.get("content") for v in (o.get("pastedContents") or {}).values() if isinstance(v, dict)]
         texts = [o["display"].strip()] + [p for p in pastes if isinstance(p, str)]
@@ -287,7 +292,9 @@ lines = {}
 days = set()
 oldest = now
 # Every transcript, subagents included: they sit in folders below the session's own file.
-files = glob.glob(os.path.join(root, "projects", "**", "*.jsonl"), recursive=True)
+projects = os.path.join(root, "projects")
+files = [f for f in glob.glob(os.path.join(projects, "**", "*.jsonl"), recursive=True)
+         if not skipped(os.path.relpath(f, projects).split(os.sep)[0])]
 for path in files:
     sub = os.sep + "subagents" + os.sep in path
     try:

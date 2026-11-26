@@ -36,9 +36,10 @@ if (process.env.NODE_ENV === 'production') {
 
 const store = await openDb();
 const signer = createSigner(process.env.SESSION_SECRET);
-// The prompt carries the script that does the counting (survey/measure.py).
+// The script that does the counting is served on its own (/llm-survey.py), so the
+// prompt stays short enough for an assistant's fetch tool to return it whole.
 const MEASURE = await fsp.readFile(path.join(ROOT, 'survey', 'measure.py'), 'utf8');
-const SURVEY = (await fsp.readFile(path.join(ROOT, 'survey', 'contribute.md'), 'utf8')).replace('{{MEASURE}}', () => MEASURE.trimEnd());
+const SURVEY = await fsp.readFile(path.join(ROOT, 'survey', 'contribute.md'), 'utf8');
 
 // ---------- plumbing ----------
 
@@ -480,6 +481,7 @@ async function handle(req, res) {
   // /c/<id>/contribute.md (a company page). The one-time code for the
   // submission travels inside the prompt, not in the line people paste.
   const md = (text) => send(res, 200, text, 'text/markdown; charset=utf-8', { 'Cache-Control': 'no-store' });
+  if (p === '/llm-survey.py') return send(res, 200, MEASURE, 'text/plain; charset=utf-8', { 'Cache-Control': 'no-store' });
   if (p === '/contribute.md') {
     const live = await store.liveWait(url.searchParams.get('t'));
     const w = live && !live.contribution_id ? live : null;

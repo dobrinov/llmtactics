@@ -75,8 +75,9 @@ Code deletes transcripts after about 30 days anyway. The charts over time
 come from answers arriving month after month, not from anyone's old history.
 
 Within the 30 days the assistant counts instead of sampling. The prompt
-carries a script, `survey/measure.py` (put in place of `{{MEASURE}}`), that
-Claude Code saves in the temporary folder, the one file the survey writes,
+points to a script, `survey/measure.py` (served at `/llm-survey.py`, so the
+prompt stays short enough for a fetch tool to return whole), that
+Claude Code downloads into the temporary folder and reads before running it, the one file the survey writes,
 and deletes at the end. It has four uses:
 
 - `measure` reads every transcript, including the subagents' (which a
@@ -115,7 +116,9 @@ count the same things by the same rules, or to leave the token fields out.
 Habits need evidence: three separate sessions in the 30 days, or
 configuration that enforces them. Every known pattern that qualifies is
 reported, so that answers can be compared, plus at most eight of the person's
-own, the ones that say most about how the person works. The assistant asks nothing on the way:
+own, the ones that say most about how the person works. The assistant asks twice: before it reads anything (where the person can
+name project folders to skip, passed as `LLM_SURVEY_SKIP`, or decline the
+shell-history and process checks), and before it sends. In between it asks nothing:
 what it cannot find (role, cost, editor, terminal) it shows as `?` in the
 one confirmation message. A habit is `active` or `new`; the
 survey no longer asks for habits people gave up, or for how long they have
