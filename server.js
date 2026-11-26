@@ -270,22 +270,28 @@ async function lensesFor(req, { profile = null, company = null, who = null }) {
 async function tourData(req, { profile = null, company = null, acc = null }) {
   const lens = profile ? 'you' : company ? 'company' : 'everyone';
   // Everyone's numbers, and a company's, come from the stored totals (lib/aggregate.js).
-  const t = { lens, home: '/', all: numbersOf(await store.totals('all')), counts: await store.counts(), group: null, me: null, owner: null, profile };
+  // The queries do not depend on each other, so they run together.
+  const [allCells, counts, groupCells, history] = await Promise.all([
+    store.totals('all'), store.counts(),
+    company ? store.totals(`c:${company.id}`) : null,
+    profile ? store.contributions({ profileId: profile.id }) : null,
+  ]);
+  const t = { lens, home: '/', all: numbersOf(allCells), counts, group: null, me: null, owner: null, profile };
   t.counts.countries = t.all.where.filter((c) => c.id !== NO_COUNTRY).length;
   if (company) {
-    Object.assign(t, { group: numbersOf(await store.totals(`c:${company.id}`), new Date(), { minGroup: MIN_GROUP }), groupName: companyName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
+    Object.assign(t, { group: numbersOf(groupCells, new Date(), { minGroup: MIN_GROUP }), groupName: companyName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
     if (acc?.owner) t.owner = { kind: 'c', edit: `/c/${company.id}/edit` };
   }
   if (profile) {
-    const history = await store.contributions({ profileId: profile.id });
     const latest = history.at(-1);
     if (!latest) return null;
     // An answer waiting for review is not in the stored totals yet. On the
     // person's own page it shows already: counted into this page's numbers only,
     // unless an earlier answer of theirs is in the totals (it would count twice).
-    if (!history.some((c) => c.status === 'accepted')) {
+    // A rejected or flagged answer is never counted, here either.
+    if (latest.status === 'pending' && !history.some((c) => c.status === 'accepted')) {
       const own = (kind) => delta(latest).map(([metric, key, value]) => ({ kind, month: monthKey(latest.created_at), metric, key, value }));
-      t.all = numbersOf([...(await store.totals('all')), ...own('l'), ...own('m')]);
+      t.all = numbersOf([...allCells, ...own('l'), ...own('m')]);
     }
     t.who = whoFor(profile, acc?.owner);
     t.home = `/u/${profile.id}`;
@@ -384,6 +390,8 @@ async function submit(req, res, url) {
   let profileId = wait.profile_id;
   let created = null;
   if (!profileId) {
+    // Only waits made before the waiting page stopped asking for a name and
+    // password carry them (two days at most); new ones leave both empty.
     created = await store.createProfile({ name: wait.name, passwordHash: wait.password_hash, id: wait.reserved_id });
     profileId = created.id;
   }
@@ -432,17 +440,22 @@ async function handle(req, res) {
   // submission travels inside the prompt, not in the line people paste.
   const md = (text) => send(res, 200, text, 'text/markdown; charset=utf-8', { 'Cache-Control': 'no-store' });
   if (p === '/contribute.md') {
-    const w = await store.liveWait(url.searchParams.get('t'));
-    return md(surveyText(req, w && !w.contribution_id ? w : null));
+    const live = await store.liveWait(url.searchParams.get('t'));
+    const w = live && !live.contribution_id ? live : null;
+    if (w) await store.markFetched(w.token);
+    return md(surveyText(req, w));
   }
   const personalMd = m(/^\/u\/([a-z0-9]{10})\/contribute\.md$/);
   if (personalMd) {
     // The line names its own wait, so two open lines for one page (Just me,
-    // and a company) never take each other's answers. Lines without one
-    // fall back to the page's newest unused wait.
-    const named = url.searchParams.has('t') ? await store.liveWait(url.searchParams.get('t')) : null;
-    const w = named ? (!named.contribution_id && [named.reserved_id, named.profile_id].includes(personalMd[1]) ? named : null)
-      : await store.openWaitFor(personalMd[1]);
+    // and a company) never take each other's answers. A named wait that is
+    // used or expired gives the copy for reading, never another wait. Lines
+    // from before codes were in them fall back to the page's newest unused wait.
+    let w;
+    if (url.searchParams.has('t')) {
+      const named = await store.liveWait(url.searchParams.get('t'));
+      w = named && !named.contribution_id && [named.reserved_id, named.profile_id].includes(personalMd[1]) ? named : null;
+    } else w = await store.openWaitFor(personalMd[1]);
     if (w) await store.markFetched(w.token);
     return md(surveyText(req, w));
   }

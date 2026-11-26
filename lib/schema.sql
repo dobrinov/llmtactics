@@ -108,8 +108,9 @@ CREATE INDEX IF NOT EXISTS models_contribution ON contribution_models(contributi
 
 -- One per prompt shown on a contribute page. The prompt carries the token;
 -- the submission must name it (once), and the waiting page then moves on.
--- name and password_hash are what the person typed while waiting; they go to
--- the profile created when the answer arrives.
+-- name and password_hash are what the person typed while waiting, in the
+-- earlier waiting page; they go to the profile created when the answer
+-- arrives. New waits leave them empty.
 CREATE TABLE IF NOT EXISTS waits (
   token text PRIMARY KEY,
   created_at timestamptz NOT NULL DEFAULT now(),

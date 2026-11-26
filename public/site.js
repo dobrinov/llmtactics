@@ -75,11 +75,12 @@ if (waitEl) {
     say('');
     flowGo(4);
   }
+  // The answer can take up to an hour, and the code lasts two days: keep
+  // checking, less often after a while. Reloading would make a new code, so
+  // the page never asks for that while the answer may be on its way.
   async function check() {
-    if (Date.now() - started > 45 * 60_000) {
-      say('Still waiting. Reload this page if your assistant sent it in another way.');
-      return;
-    }
+    const waited = Date.now() - started;
+    if (waited > 60 * 60_000) say('Still waiting. A long history takes a while; the link your assistant gives you at the end opens your results too.');
     if (document.visibilityState === 'visible') {
       try {
         const r = await fetch(`/api/wait/${waitEl.dataset.wait}`, { cache: 'no-store' });
@@ -92,7 +93,7 @@ if (waitEl) {
         }
       } catch { /* try again on the next tick */ }
     }
-    setTimeout(check, 3000);
+    setTimeout(check, waited > 15 * 60_000 ? 15_000 : 3000);
   }
   setTimeout(check, 3000);
 }
