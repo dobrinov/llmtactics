@@ -9,7 +9,8 @@ import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLE
 import { counted, MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, devTools } from './lib/stats.js';
 import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
 import * as flow from './lib/flow.js';
-import { numbersOf, toolDetailOf } from './lib/aggregate.js';
+import { numbersOf, toolDetailOf, delta } from './lib/aggregate.js';
+import { monthKey } from './lib/stats.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
@@ -213,6 +214,9 @@ async function ownProfileId(req) {
   return id && (await store.profile(id)) ? id : null;
 }
 
+// The line people paste: their page's address, and the wait it answers.
+const lineFor = (req, pageId, token) => flow.promptLine(`${baseUrl(req)}/u/${pageId}/contribute.md?t=${token}`);
+
 // A one-time code for answering through a company. A browser that already has
 // a page answers onto it; anyone else gets a new page, reserved now.
 // `pageId` is the address in the line to paste.
@@ -276,6 +280,13 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
     const history = await store.contributions({ profileId: profile.id });
     const latest = history.at(-1);
     if (!latest) return null;
+    // An answer waiting for review is not in the stored totals yet. On the
+    // person's own page it shows already: counted into this page's numbers only,
+    // unless an earlier answer of theirs is in the totals (it would count twice).
+    if (!history.some((c) => c.status === 'accepted')) {
+      const own = (kind) => delta(latest).map(([metric, key, value]) => ({ kind, month: monthKey(latest.created_at), metric, key, value }));
+      t.all = numbersOf([...(await store.totals('all')), ...own('l'), ...own('m')]);
+    }
     t.who = whoFor(profile, acc?.owner);
     t.home = `/u/${profile.id}`;
     t.me = {
@@ -330,7 +341,7 @@ setInterval(() => store.pruneWaits().catch(() => {}), 3600_000).unref();
 // new page's editor's code, for the browser that is given the page.
 async function resolveWait(req, w) {
   if (!w.contribution_id) return { status: w.fetched_at ? 'fetched' : 'waiting' };
-  const to = `/u/${w.profile_id}${w.company_id ? `?vs=${w.company_id}` : ''}`;
+  const to = `/u/${w.profile_id}`;
   if (grantsOf(req).includes(`ou:${w.profile_id}`)) return { status: 'done', redirect: to };
   if (await store.claimWait(w.token)) {
     // A new page gets its editor's code now, for the browser that owns it.
@@ -396,7 +407,7 @@ async function handle(req, res) {
     const w = await store.liveWait(waitApi[1]);
     if (!w) return json(res, 404, { status: 'expired' });
     const r = await resolveWait(req, w);
-    return json(res, 200, { status: r.status, redirect: r.redirect, page: r.redirect?.split('?')[0], code: r.code }, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
+    return json(res, 200, { status: r.status, redirect: r.redirect, page: r.redirect, code: r.code }, r.grant ? { 'Set-Cookie': grantCookie(req, r.grant) } : {});
   }
 
   if (req.method === 'POST') return post(req, res, url, p, m);
@@ -418,7 +429,12 @@ async function handle(req, res) {
   }
   const personalMd = m(/^\/u\/([a-z0-9]{10})\/contribute\.md$/);
   if (personalMd) {
-    const w = await store.openWaitFor(personalMd[1]);
+    // The line names its own wait, so two open lines for one page (Just me,
+    // and a company) never take each other's answers. Lines without one
+    // fall back to the page's newest unused wait.
+    const named = url.searchParams.has('t') ? await store.liveWait(url.searchParams.get('t')) : null;
+    const w = named ? (!named.contribution_id && [named.reserved_id, named.profile_id].includes(personalMd[1]) ? named : null)
+      : await store.openWaitFor(personalMd[1]);
     if (w) await store.markFetched(w.token);
     return md(surveyText(req, w));
   }
@@ -443,7 +459,7 @@ async function handle(req, res) {
     const { token, reservedId } = await store.createWait();
     // An invitation link names its sender, and nothing else about them.
     const inviter = await store.profileByInvite(url.searchParams.get('from'));
-    return privateHtml(res, flow.joinMePage({ token, line: flow.promptLine(`${baseUrl(req)}/u/${reservedId}/contribute.md`), inviter: inviter ? { name: inviter.name } : null }));
+    return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, reservedId, token), inviter: inviter ? { name: inviter.name } : null }));
   }
 
   // A person's page.
@@ -457,7 +473,7 @@ async function handle(req, res) {
     if (prof[2] === '/contribute') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
       const { token } = await store.createWait({ profileId: profile.id });
-      return privateHtml(res, flow.joinMePage({ token, line: flow.promptLine(`${baseUrl(req)}/u/${profile.id}/contribute.md`), profile }));
+      return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, profile.id, token), profile }));
     }
     if (prof[2] === '/export.json') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
@@ -484,7 +500,7 @@ async function handle(req, res) {
       if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
       if (comp[2] === '/invite' && await companyOpen(company)) return privateHtml(res, flow.companyOpenPage({ company, own: await ownProfileId(req) }));
       const wait = await companyWait(req, company);
-      const props = { company, token: wait.token, line: flow.promptLine(`${baseUrl(req)}/u/${wait.pageId}/contribute.md`) };
+      const props = { company, token: wait.token, line: lineFor(req, wait.pageId, wait.token) };
       if (comp[2] === '/invite') return privateHtml(res, flow.companyInvitePage({ ...props, base: baseUrl(req), code: shownCode(req, 'c', company.id) }));
       return privateHtml(res, flow.joinMePage(props));
     }
@@ -492,8 +508,16 @@ async function handle(req, res) {
     if (!(await companyOpen(company))) {
       if (comp[2]) return redirect(res, `/c/${company.id}`);
       const own = new Set(grantsOf(req).filter((g) => g.startsWith('ou:')).map((g) => g.slice(3)));
-      const seats = (await store.contributions({ companyId: company.id })).filter((c) => c.status !== 'rejected')
-        .map((c) => ({ status: c.status === 'accepted' ? 'accepted' : 'review', mine: own.has(c.profile_id) }));
+      // One seat per person, as companyOpen counts them: accepted once any of their answers is.
+      const people = new Map();
+      for (const c of await store.contributions({ companyId: company.id })) {
+        if (c.status === 'rejected') continue;
+        const key = c.profile_id ?? `c${c.id}`;
+        const seat = people.get(key) ?? { status: 'review', mine: own.has(c.profile_id) };
+        if (c.status === 'accepted') seat.status = 'accepted';
+        people.set(key, seat);
+      }
+      const seats = [...people.values()];
       return privateHtml(res, flow.companyProgressPage({ company, base: baseUrl(req), seats, owner: acc.owner }));
     }
     const t = await tourData(req, { company, acc });

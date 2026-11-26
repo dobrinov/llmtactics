@@ -41,8 +41,10 @@ it, but the password only opens the page.
 ## How a contribution flows
 
 1. A contribute page shows one line to paste:
-   - for yourself, `Fetch <base>/u/<id>/contribute.md and follow the instructions in it.`
-     The `<id>` is the address your results page will get.
+   - for yourself, `Fetch <base>/u/<id>/contribute.md?t=<code> and follow the instructions in it.`
+     The `<id>` is the address your results page will get; `<code>` is the
+     one-time code of this line, so two open lines for one page never take
+     each other's answers.
      A company's contribute page shows the same kind of line, with the company
      on the one-time code. (`<base>/c/<id>/contribute.md` still works: each
      fetch gets its own code.)
