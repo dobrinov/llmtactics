@@ -1,6 +1,7 @@
 # HTTPS certificates are requested and renewed automatically.
 {$DOMAIN} {
-	encode gzip
+	encode zstd gzip
+	header -Server
 	reverse_proxy app:4400
 }
 www.{$DOMAIN} {

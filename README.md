@@ -171,8 +171,22 @@ git pull && docker compose up -d --build
 # analysis, by hand or nightly from cron
 docker compose exec app npm run analyse
 0 3 * * * cd /opt/llmtactics && docker compose exec -T app npm run analyse >> /var/log/llmtactics-analyse.log 2>&1
-# backup
-docker compose exec -T db pg_dump -U llmtactics llmtactics | gzip > backup-$(date +%F).sql.gz
+# logs
+docker compose logs -f app
+```
+
+The app refuses to start without `PUBLIC_URL` (compose sets it from `DOMAIN`),
+`SESSION_SECRET` of 32 characters or more, or with an `ADMIN_PASSWORD` shorter
+than 12. On first start it creates the tables and counts the totals; later
+starts count again only when the catalog, tools or models list changed.
+
+The `backup` service writes one dump a day to `./backups/<day of month>.sql.gz`,
+so the last month is kept. They sit on the same disk as the database: copy them
+off the server (Hetzner Storage Box, S3, or `rsync` to another machine) too.
+
+```sh
+# restore a dump
+gunzip -c backups/14.sql.gz | docker compose exec -T db psql -U llmtactics llmtactics
 ```
 
 ## Code

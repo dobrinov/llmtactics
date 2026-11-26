@@ -1,9 +1,16 @@
-# The whole site on one small server: PostgreSQL, the app, and Caddy for HTTPS.
+# The whole site on one small server: PostgreSQL, the app, Caddy for HTTPS,
+# and a nightly database dump.
 #   cp .env.example .env   (fill it in)   then   docker compose up -d --build
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
 services:
   db:
     image: postgres:18-alpine
     restart: unless-stopped
+    <<: *logging
     environment:
       POSTGRES_USER: llmtactics
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -18,6 +25,7 @@ services:
   app:
     build: .
     restart: unless-stopped
+    <<: *logging
     depends_on:
       db:
         condition: service_healthy
@@ -34,6 +42,7 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    <<: *logging
     depends_on: [app]
     ports: ["80:80", "443:443"]
     environment:
@@ -41,6 +50,37 @@ services:
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy:/data
+
+  # One compressed dump a day in ./backups, named by day of the month, so the
+  # last month is kept and each file is overwritten a month later. Copy them
+  # off the server too: a dump on the same disk does not survive losing it.
+  # Restore: gunzip -c backups/<dd>.sql.gz | docker compose exec -T db psql -U llmtactics llmtactics
+  backup:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    <<: *logging
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: llmtactics
+      PGDATABASE: llmtactics
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./backups:/backups
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          day=$$(date +%d)
+          if pg_dump --clean --if-exists | gzip > /backups/part.sql.gz; then
+            mv /backups/part.sql.gz /backups/$$day.sql.gz && echo "backup $$day done"
+          else
+            echo "backup $$day failed"
+          fi
+          sleep 86400
+        done
 
 volumes:
   db:

@@ -24,6 +24,16 @@ const SECURE = PUBLIC_URL.startsWith('https://');
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 const MAX_BODY = 32 * 1024;
 
+// In production, refuse to start without what the site needs: without
+// PUBLIC_URL the pasted prompt would point at whatever Host a request names.
+if (process.env.NODE_ENV === 'production') {
+  const missing = [];
+  if (!process.env.DATABASE_URL) missing.push('DATABASE_URL');
+  if (!PUBLIC_URL.startsWith('https://')) missing.push('PUBLIC_URL (https://…)');
+  if (ADMIN_PASSWORD && ADMIN_PASSWORD.length < 12) missing.push('ADMIN_PASSWORD of at least 12 characters, or none to switch the admin area off');
+  if (missing.length) { console.error(`Set ${missing.join('; ')}.`); process.exit(1); }
+}
+
 const store = await openDb();
 const signer = createSigner(process.env.SESSION_SECRET);
 // The prompt carries the script that does the counting (survey/measure.py).
@@ -740,4 +750,9 @@ server.listen(PORT, () => {
   const base = PUBLIC_URL || `http://localhost:${PORT}`;
   console.log(`${SITE}  ${base}${ADMIN_PASSWORD ? `\nadmin            ${base}/admin` : '\nadmin            disabled (set ADMIN_PASSWORD)'}`);
 });
-for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => server.close(() => store.close().then(() => process.exit(0))));
+// Stop taking requests, let the ones in progress finish, then close the
+// database. Connections still open after 5 seconds are cut.
+for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => {
+  server.close(() => store.close().then(() => process.exit(0)));
+  setTimeout(() => server.closeAllConnections(), 5000).unref();
+});
