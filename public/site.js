@@ -155,13 +155,16 @@ if (deck) {
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
     // An open details card keeps the keyboard: Esc closes it, and the arrow keys
-    // step to the previous or next habit when the card has those buttons.
+    // step to the previous or next habit when the card has those buttons. Past
+    // the last habit (or before the first) the keys leave the slide, as they do
+    // without a card, so the slides after the radar are not hidden behind it.
     let card = null;
     try { card = document.querySelector('.tcard:popover-open'); } catch { /* no :popover-open support */ }
     if (card) {
       const dir = { ArrowRight: 1, PageDown: 1, ArrowLeft: -1, PageUp: -1 }[e.key];
       const to = dir && card.querySelector(`[data-card-step="${dir}"]`);
-      if (to) { e.preventDefault(); to.click(); }
+      if (to && to.hasAttribute('data-card-wrap')) { e.preventDefault(); card.hidePopover(); goTo(current + dir); }
+      else if (to) { e.preventDefault(); to.click(); }
       return;
     }
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }

@@ -1,4 +1,4 @@
-# Reads the last 30 days of Claude Code history, and changes nothing.
+# Reads the last 30 days of Claude Code and Codex history, and changes nothing.
 #   measure          totals, medians and model names: no prompt, path or project name
 #   read N           page N of the prompts the user typed, with secrets masked
 #   count RE [RE..]  for each expression, the sessions and days whose prompts match it,
@@ -13,14 +13,20 @@ now = datetime.now(timezone.utc)
 since = datetime.combine(date.today() - timedelta(days=DAYS - 1), time.min).astimezone()
 day_of = lambda t: t.astimezone().date()
 root = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude")
+codex = os.environ.get("CODEX_HOME") or os.path.expanduser("~/.codex")
 # Text the harness writes into the user's turn; not something the user typed.
 # Work the user keeps out of the survey: LLM_SURVEY_SKIP='name1,name2' skips every session whose
 # project folder's path holds one of the names (without case, any punctuation alike).
 norm = lambda s: re.sub(r"[^a-z0-9]+", "-", (s or "").lower())
 SKIP = [norm(x).strip("-") for x in os.environ.get("LLM_SURVEY_SKIP", "").split(",") if x.strip()]
 skipped = lambda where: any(s and s in norm(where) for s in SKIP)
-NOT_TYPED = ("<task-notification", "<system-reminder", "<local-command", "<command-", "<bash-")
+NOT_TYPED = ("<task-notification", "<system-reminder", "<local-command", "<command-", "<bash-",
+             "<environment_context", "<user_instructions", "<user_shell_command", "# AGENTS.md instructions")
 PARTS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
+# What each kind of token costs next to new input, at list prices. The ratios are the same for every
+# Claude model, and for every OpenAI model Codex uses, which bills no cache writes.
+CLAUDE_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 1.25, "output_tokens": 5}
+OPENAI_PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 0, "output_tokens": 8}
 
 
 def when(o):
@@ -28,6 +34,40 @@ def when(o):
         return datetime.fromisoformat(o["timestamp"].replace("Z", "+00:00"))
     except Exception:
         return None
+
+
+def lines_of(o):
+    try:
+        return open(o, errors="ignore")
+    except OSError:
+        return []
+
+
+# Codex writes one file per session ("rollout"), below sessions/<year>/<month>/<day>/, and moves
+# archived ones to archived_sessions/. Its first line describes the session.
+codex_files = sorted(set(glob.glob(os.path.join(codex, "sessions", "**", "*.jsonl"), recursive=True)
+                         + glob.glob(os.path.join(codex, "archived_sessions", "*.jsonl"))))
+
+
+def codex_meta(path):
+    for line in lines_of(path):
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(o, dict) and o.get("type") == "session_meta" and isinstance(o.get("payload"), dict):
+            p = o["payload"]
+            source = p.get("source")
+            parent = re.search(r'"parent_thread_id":\s*"([^"]+)"', json.dumps(source)) if isinstance(source, dict) else None
+            return {"id": p.get("id") or path, "cwd": p.get("cwd") or "",
+                    # A subagent's session: its replies count, its "user" turns are the parent's instructions.
+                    "sub": isinstance(source, dict) and "subagent" in source, "parent": parent and parent.group(1)}
+        break
+    return {"id": path, "cwd": "", "sub": False, "parent": None}
+
+
+codex_meta_of = {path: codex_meta(path) for path in codex_files}
+codex_cwd = {m["id"]: m["cwd"] for m in codex_meta_of.values()}
 
 
 def typed(o, msg):
@@ -89,6 +129,18 @@ def masked(text, limit):
 # A session that ran this survey is not a habit: it starts with the invitation, or names the script.
 SURVEY = re.compile(r"Fetch \S+/contribute\S* and follow|llm-survey\.py", re.I)
 log, older, surveyed = [], [], set()
+
+
+def logged(t, session, display, pastes, tool):
+    texts = [display.strip()] + [p for p in pastes if isinstance(p, str)]
+    if t < since:
+        older.append((t, texts))
+        return
+    if session and any(SURVEY.search(x) for x in texts):
+        surveyed.add(session)
+    log.append((t, session, display, pastes, texts, tool))
+
+
 try:
     for line in open(os.path.join(root, "history.jsonl"), errors="ignore"):
         try:
@@ -99,15 +151,20 @@ try:
         if not isinstance(o.get("display"), str) or skipped(o.get("project")):
             continue
         pastes = [v.get("content") for v in (o.get("pastedContents") or {}).values() if isinstance(v, dict)]
-        texts = [o["display"].strip()] + [p for p in pastes if isinstance(p, str)]
-        if t < since:
-            older.append((t, texts))
-            continue
-        if o.get("sessionId") and any(SURVEY.search(x) for x in texts):
-            surveyed.add(o.get("sessionId"))
-        log.append((t, o.get("sessionId"), o["display"], pastes, texts))
+        logged(t, o.get("sessionId"), o["display"], pastes, "Claude Code")
 except OSError:
     pass
+# Codex's prompt log: {"session_id", "ts" in seconds, "text"}; pasted text is part of the prompt.
+for line in lines_of(os.path.join(codex, "history.jsonl")):
+    try:
+        o = json.loads(line)
+        t = datetime.fromtimestamp(o["ts"], timezone.utc)
+    except (ValueError, KeyError, TypeError, OverflowError, OSError):
+        continue
+    text = o.get("text")
+    if not isinstance(text, str) or not text.strip() or text.lstrip().startswith(NOT_TYPED) or skipped(codex_cwd.get(o.get("session_id"))):
+        continue
+    logged(t, o.get("session_id"), text, [], "Codex CLI")
 log.sort(key=lambda e: e[0])
 log = [e for e in log if e[1] not in surveyed]
 log_days = sorted({day_of(e[0]) for e in log})
@@ -193,7 +250,8 @@ if mode == "tools":
                 if window(t):
                     days_of[n].add(day_of(t))
     # This assistant's own days, and the terminal and multiplexer it runs in share them.
-    days_of["Claude Code"] |= set(log_days)
+    for e in log:
+        days_of[e[5]].add(day_of(e[0]))
     here = []
     if os.environ.get("TMUX"):
         here.append("tmux")
@@ -269,7 +327,7 @@ if mode == "read":
     PAGE = 16000  # bytes: small enough for a tool to show whole
     order = {}
     pages, size = [[]], 0
-    for t, session, text, pastes, _ in log:
+    for t, session, text, pastes, *_ in log:
         row = "d%02d s%d | %s" % (log_days.index(day_of(t)) + 1, order.setdefault(session, len(order) + 1), masked(text, 600))
         for paste in pastes:
             row += " [pasted: %s]" % (masked(paste, 120) if isinstance(paste, str) else "text not kept")
@@ -323,7 +381,7 @@ for path in files:
         if o.get("type") == "assistant" and isinstance(usage, dict):
             if not sub:
                 stamps[session].append(t)
-            r = requests.setdefault(msg.get("id") or o.get("uuid"), {"model": msg.get("model"), "sub": sub, "session": session, "t": t, "seen": set()})
+            r = requests.setdefault(msg.get("id") or o.get("uuid"), {"model": msg.get("model"), "sub": sub, "session": session, "t": t, "seen": set(), "price": CLAUDE_PRICE})
             r["seen"].add(session)  # a resumed session holds a copy of the replies before it
             for p in PARTS:
                 r[p] = max(r.get(p, 0), usage.get(p) or 0)
@@ -333,6 +391,72 @@ for path in files:
                     text = [i.get("content"), i.get("new_string")] + [e.get("new_string") for e in i.get("edits") or [] if isinstance(e, dict)]
                     lines[b.get("id")] = sum(len(s.splitlines()) for s in text if isinstance(s, str))
 
+
+def patch_lines(text):  # lines a Codex patch adds: in "*** Begin Patch" format each starts with "+"
+    return sum(1 for l in text.splitlines() if l.startswith("+") and not l.startswith("+++"))
+
+
+# Codex: every line is {"timestamp", "type", "payload"}. The prompts are the "user_message" events;
+# after each model reply comes a "token_count" event whose last_token_usage is that reply. The same
+# event is sometimes written twice, and a forked session copies the events before it: a reply is
+# one (time, running total) pair. OpenAI counts cached input inside input_tokens, and reasoning
+# inside output_tokens.
+for path in codex_files:
+    meta = codex_meta_of[path]
+    if skipped(meta["cwd"]):
+        continue
+    sub = meta["sub"]
+    session = (meta["parent"] if sub else None) or meta["id"]
+    model, running = None, None
+    for line in lines_of(path):
+        try:
+            o = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(o, dict) or not isinstance(o.get("payload"), dict):
+            continue
+        p, kind = o["payload"], o.get("type")
+        if kind == "turn_context":
+            model = p.get("model") or model
+            continue
+        t = when(o)
+        if not t:
+            continue
+        oldest = min(oldest, t)
+        info = p.get("info") if kind == "event_msg" and p.get("type") == "token_count" else None
+        total = json.dumps(info.get("total_token_usage"), sort_keys=True) if isinstance(info, dict) else None
+        fresh = total is not None and total != running
+        if total is not None:
+            running = total
+        if t < since:
+            continue
+        if kind == "event_msg" and p.get("type") == "user_message" and not sub:
+            stamps[session].append(t)
+            text = p.get("message")
+            if p.get("kind") in (None, "plain") and isinstance(text, str) and text.strip() and not text.lstrip().startswith(NOT_TYPED):
+                prompts[session] += 1
+                days.add(day_of(t))
+        last = info.get("last_token_usage") if isinstance(info, dict) else None
+        if fresh and isinstance(last, dict):
+            if not sub:
+                stamps[session].append(t)
+            num = lambda k: last.get(k) if isinstance(last.get(k), int) else 0
+            cached = min(num("cached_input_tokens"), num("input_tokens"))
+            r = requests.setdefault(("codex", o.get("timestamp"), total), {
+                "model": model, "sub": sub, "session": session, "t": t, "seen": set(), "price": OPENAI_PRICE,
+                "input_tokens": num("input_tokens") - cached, "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": cached, "output_tokens": num("output_tokens")})
+            r["seen"].add(session)
+        if kind == "response_item" and p.get("type") in ("custom_tool_call", "function_call"):
+            body = p.get("input") if p.get("type") == "custom_tool_call" else p.get("arguments")
+            if isinstance(body, str) and "*** Begin Patch" in body:
+                try:  # a shell call carries the patch inside a JSON list of arguments
+                    parsed = json.loads(body)
+                    body = "\n".join(x for x in (parsed.get("command") or []) if isinstance(x, str)) if isinstance(parsed, dict) else body
+                except (ValueError, AttributeError, TypeError):
+                    pass
+                lines[("codex", p.get("call_id") or o.get("timestamp"))] = patch_lines(body)
+
 reqs = [r for r in requests.values() if sum(r[p] for p in PARTS)]
 total = lambda rows, *parts: sum(r[p] for r in rows for p in (parts or PARTS))
 tokens = total(reqs) or 1
@@ -340,10 +464,8 @@ covered = max(1, min(DAYS, (day_of(now) - day_of(oldest)).days + 1))
 month = lambda n: round(n * DAYS / covered)
 median = lambda values: round(statistics.median(values)) if values else None
 pct = lambda n: round(100 * n / tokens)
-# What each kind of token costs next to new input, at list prices: the ratios are the same for every Claude model.
-PRICE = {"cache_read_input_tokens": 0.1, "input_tokens": 1, "cache_creation_input_tokens": 1.25, "output_tokens": 5}
-cost = sum(r[p] * PRICE[p] for r in reqs for p in PARTS) or 1
-cost_pct = lambda *parts: round(100 * sum(r[p] * PRICE[p] for r in reqs for p in parts) / cost)
+cost = sum(r[p] * r["price"][p] for r in reqs for p in PARTS) or 1
+cost_pct = lambda *parts: round(100 * sum(r[p] * r["price"][p] for r in reqs for p in parts) / cost)
 per_session = defaultdict(int)
 by_model = defaultdict(int)
 for r in reqs:
@@ -363,7 +485,7 @@ if mode == "count":
     replies = defaultdict(list)
     for r in reqs:
         for session in r["seen"]:  # a copy sits before the first prompt of its session, so in no turn
-            replies[session].append((r["t"], sum(r[p] * PRICE[p] for p in PARTS)))
+            replies[session].append((r["t"], sum(r[p] * r["price"][p] for p in PARTS)))
     turns = defaultdict(list)
     for e in log:
         turns[e[1]].append(e[0])
@@ -401,7 +523,7 @@ if mode == "count":
 
 worked = [s for s in prompts if prompts[s]]
 print(json.dumps({
-    "transcripts_read": len(files),
+    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files))) if n},
     "days_covered": covered,
     "days_with_prompts": min(len(days), covered),
     "sessions": len(worked),
