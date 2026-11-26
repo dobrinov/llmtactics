@@ -1,9 +1,8 @@
 # Survey: how does your user work with you?
 
 You are an AI assistant. Your user has asked you to take part in a short survey
-for **{{SITE}}**, a shared radar of *LLM usage patterns*: named,
-reusable ways people work with assistants like you, in the spirit of software
-design patterns. This submission goes to {{DESTINATION}}.
+for **{{SITE}}**, a shared radar of *LLM working habits*: named,
+repeatable ways people work with assistants like you. This submission goes to {{DESTINATION}}.
 {{NOTICE}}
 
 Your job: look at your own history with this user, identify the recurring ways
@@ -186,10 +185,10 @@ The user's own messages matter far more than your replies.
   the user ran this survey. Briefs written for other agents that were
   pasted in as prompts are not habits either.
 
-A pattern is a **repeatable way of working**, not a topic.
+A habit is a **repeatable way of working**, not a topic.
 
-- Not a pattern: "writes Python", "asks about Kubernetes", "uses it a lot".
-- A pattern: "asks for a written plan and edits the plan before any code is
+- Not a habit: "writes Python", "asks about Kubernetes", "uses it a lot".
+- A habit: "asks for a written plan and edits the plan before any code is
   written", "runs a second model as a reviewer of the first one's diff",
   "keeps a notes file the assistant must update at the end of every session".
 
@@ -207,7 +206,7 @@ Also look for the kinds of habit that are easy to miss:
   keys, production consoles. Report that the user does this and for what
   kind of task; never report the credential, host or service.
 - **Named tools.** A tool the user reaches for by name, such as a design
-  tool, a specialised model or a bot, is a pattern of its own. Do not fold it
+  tool, a specialised model or a bot, is a habit of its own. Do not fold it
   into a generic one.
 - **Recent arrivals.** A habit that started this month has few occurrences
   but may be the most interesting thing in the history.
@@ -216,32 +215,32 @@ Also look for the kinds of habit that are easy to miss:
 least three separate sessions of the 30 days (`qualifies`), or when the
 configuration enforces it. Then:
 
-- report **every** known pattern from the table below that qualifies. They
+- report **every** known habit from the table below that qualifies. They
   are what makes one person's answer comparable with another's, so check
   each row of the table against the prompts, not only the habits that
   stood out;
-- add **at most 8** habits of the user's own that match no known pattern.
+- add **at most 8** habits of the user's own that match no known habit.
   When more qualify, keep the ones that say most about how this user works:
   a way of working in the user's own words comes before a built-in command
   typed often (checking a meter, switching a model), and what few people
   would think of comes before what everyone does. Between two alike, keep
   the one in more sessions.
 
-There is no number to reach: three patterns with evidence are a better
+There is no number to reach: three habits with evidence are a better
 answer than ten with guesses. Leave out habits the user has given up; this
 survey shows how people work now.
 
-For each pattern, write:
+For each habit, write (the JSON calls the list `patterns`):
 
-- `title`: a short, memorable name, 2 to 5 words, like a design pattern name.
-- `catalog_id`: if the habit is the same as one of the known patterns below,
+- `title`: a short, memorable name, 2 to 5 words, like "Plan Before Code".
+- `catalog_id`: if the habit is the same as one of the known habits below,
   its id; otherwise `null`. Match on what the user does, not on the name. Only
   match when it really is the same habit; a near miss stays `null` with your
   own title.
-- `quadrant`: for an unmatched pattern, the closest of `brief` (what the user
+- `quadrant`: for an unmatched habit, the closest of `brief` (what the user
   hands over before work starts), `steer` (how work is split and directed),
   `check` (how output is verified), `delegate` (what the assistant is trusted
-  to do alone). Matched patterns can leave it out.
+  to do alone). Matched habits can leave it out.
 - `summary`: one sentence saying what the user does.
 - `when_used`: one short sentence: when the user reaches for it.
 - `problem_solved`: one short sentence: what goes wrong without it.
@@ -259,7 +258,7 @@ For each pattern, write:
   that starts no work of its own, such as checking a meter: typed while
   other work runs, it is given that work's cost.
 
-### Known patterns
+### Known habits
 
 | id | title | what the user does |
 | --- | --- | --- |
@@ -437,7 +436,7 @@ Everything you send is shown to the user, word for word, in step 4.
 Keep this to a single message and a single reply. What you send in step 5
 must be exactly the JSON shown here, with nothing added or left out. Show:
 
-1. the patterns as a short list, one line each: **title** and summary;
+1. the habits as a short list, one line each: **title** and summary;
 2. the tools, one line per kind, each with how often it is used (`Ghostty
    daily`). For editor, terminal, multiplexer and chat assistants, write `?`
    where you found none;

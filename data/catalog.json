@@ -1,5 +1,5 @@
 {
-  "_comment": "The known patterns. The survey prompt lists them so assistants can match a habit to an id; anything that matches none is kept as unmatched until it is added here.",
+  "_comment": "The known habits (kept under the key patterns). The survey prompt lists them so assistants can match a habit to an id; anything that matches none is kept as unmatched until it is added here.",
   "patterns": [
     { "id": "paste-the-evidence", "title": "Paste The Evidence", "quadrant": "brief", "summary": "Hand over the raw error or log, not your summary of it.", "when": "Something failed and there is an error, log or stack trace.", "problem": "Fixes aimed at your guess instead of the real failure." },
     { "id": "standing-instructions", "title": "Standing Instructions", "quadrant": "brief", "summary": "Keep a file of rules and project facts the assistant reads at the start of every session.", "when": "The same correction comes up for the third time.", "problem": "Explaining the same context again in every session." },
