@@ -1,9 +1,9 @@
-# Reads the last 30 days of Claude Code, Codex, Gemini CLI and OpenCode history, and changes nothing.
+# Reads the last 30 days of Claude Code, Codex, Gemini CLI, OpenCode and Cursor history, and changes nothing.
 #   measure          totals, medians and model names: no prompt, path or project name
 #   read N           page N of the prompts the user typed, with secrets masked
 #   count RE [RE..]  for each expression, the sessions and days whose prompts match it,
 #                    and the frequency, status and cost to report
-import glob, hashlib, json, os, re, statistics, sys
+import glob, hashlib, json, os, re, sqlite3, statistics, sys, urllib.parse
 from collections import defaultdict
 from datetime import date, datetime, time, timedelta, timezone
 
@@ -243,6 +243,104 @@ for f in glob.glob(os.path.join(opencode, "session", "*", "*.json")):
             text = "".join(x.get("text") or "" for x in parts if x.get("type") == "text" and not x.get("synthetic")).strip()
             if text and not text.startswith(NOT_TYPED):
                 logged(t, meta["id"], text, [], "OpenCode")
+
+
+# Cursor keeps its agent chats ("composers") in one SQLite database, as JSON under keys of the table
+# cursorDiskKV: composerData:<composer> describes a chat, bubbleId:<composer>:<bubble> is one
+# message (type 1 the user's, 2 a reply). The table composerHeaders, where there is one, says which
+# folder each chat was in, whether a subagent ran it, and when. Cursor bills on its servers, so its
+# messages hold no token counts (or zeros): its replies count in time and sessions, not in tokens.
+def cursor_db():
+    places = [os.path.expanduser("~/Library/Application Support/Cursor"), os.path.expanduser("~/.config/Cursor"),
+              os.path.join(os.environ.get("APPDATA") or "-", "Cursor")]
+    for place in places:
+        path = os.path.join(place, "User", "globalStorage", "state.vscdb")
+        if not os.path.isfile(path):
+            continue
+        # Read only; while Cursor runs, a sandbox can refuse even that, and an unchanging copy is read instead.
+        for flags in ("mode=ro", "immutable=1"):
+            try:
+                db = sqlite3.connect("file:%s?%s" % (urllib.parse.quote(path), flags), uri=True)
+                db.execute("SELECT count(*) FROM cursorDiskKV").fetchone()
+                return db, place
+            except sqlite3.Error:
+                continue
+    return None, None
+
+
+def cursor_time(value):
+    if isinstance(value, (int, float)):
+        return ms(value)
+    return when({"timestamp": value}) if isinstance(value, str) else None
+
+
+cursor_chats, cursor_messages = [], []  # messages: (time, session, sub, bubble, model)
+cursor_lines = {}
+db, cursor_home = cursor_db()
+if db:
+    def kv(key):
+        row = db.execute("SELECT value FROM cursorDiskKV WHERE key = ?", (key,)).fetchone()
+        try:
+            return json.loads(row[0]) if row else None
+        except (ValueError, TypeError):
+            return None
+    folder_of, subagent = {}, set()
+    try:
+        for cid, is_sub, value in db.execute("SELECT composerId, isSubagent, value FROM composerHeaders"):
+            try:
+                folder_of[cid] = ((json.loads(value).get("workspaceIdentifier") or {}).get("uri") or {}).get("fsPath")
+            except (ValueError, AttributeError, TypeError):
+                pass
+            if is_sub:
+                subagent.add(cid)
+    except sqlite3.Error:
+        pass
+    # Without that table, each workspace's own database lists its chats, next to workspace.json.
+    if not folder_of:
+        for w in glob.glob(os.path.join(cursor_home, "User", "workspaceStorage", "*", "workspace.json")):
+            where = urllib.parse.unquote(urllib.parse.urlparse((json_file(w) or {}).get("folder") or "").path)
+            try:
+                wdb = sqlite3.connect("file:%s?immutable=1" % urllib.parse.quote(os.path.join(os.path.dirname(w), "state.vscdb")), uri=True)
+                row = wdb.execute("SELECT value FROM ItemTable WHERE key = 'composer.composerData'").fetchone()
+                for c in (json.loads(row[0]).get("allComposers") or []) if row else []:
+                    folder_of[c.get("composerId")] = where
+            except (sqlite3.Error, ValueError, AttributeError, TypeError):
+                pass
+    parent = {}
+    chats = []
+    for key, value in db.execute("SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"):
+        try:
+            chat = json.loads(value)
+        except (ValueError, TypeError):
+            continue
+        if isinstance(chat, dict) and chat.get("composerId"):
+            chats.append(chat)
+            for child in chat.get("subComposerIds") or []:
+                parent[child] = chat["composerId"]
+    for chat in chats:
+        cid = chat["composerId"]
+        # As with Gemini: when folders are skipped, a chat whose folder is unknown is skipped too.
+        if (SKIP and not folder_of.get(cid)) or skipped(folder_of.get(cid)):
+            continue
+        start = cursor_time(chat.get("createdAt"))
+        if not start:
+            continue
+        cursor_chats.append(cid)
+        sub = cid in subagent or cid in parent
+        session = parent.get(cid, cid) if sub else cid
+        model = (chat.get("modelConfig") or {}).get("modelName")
+        model = None if model in (None, "default", "auto") else model
+        if start >= since and isinstance(chat.get("totalLinesAdded"), int):
+            cursor_lines[("cursor", cid)] = chat["totalLinesAdded"]
+        ids = [h.get("bubbleId") for h in chat.get("fullConversationHeadersOnly") or [] if isinstance(h, dict)]
+        bubbles = [b for b in chat.get("conversation") or [] if isinstance(b, dict)] + [b for b in map(lambda i: kv("bubbleId:%s:%s" % (cid, i)), ids) if isinstance(b, dict)]
+        for b in bubbles:
+            t = cursor_time(b.get("createdAt")) or cursor_time((b.get("timingInfo") or {}).get("clientStartTime")) or start
+            model = ((b.get("modelInfo") or {}).get("modelName") or model) if b.get("type") == 1 else model
+            cursor_messages.append((t, session, sub, b, model))
+            text = b.get("text") if b.get("type") == 1 and not sub else None
+            if isinstance(text, str) and text.strip() and not text.lstrip().startswith(NOT_TYPED):
+                logged(t, cid, text, [], "Cursor")
 log.sort(key=lambda e: e[0])
 log = [e for e in log if e[1] not in surveyed]
 log_days = sorted({day_of(e[0]) for e in log})
@@ -630,6 +728,28 @@ for t, session, sub, m, parts in opencode_messages:
         elif isinstance(i.get("patchText"), str):
             lines[("opencode", x.get("id"))] = patch_lines(i["patchText"])
 
+for t, session, sub, b, model in cursor_messages:
+    oldest = min(oldest, t)
+    if t < since:
+        continue
+    if b.get("type") == 1 and not sub:
+        stamps[session].append(t)
+        if isinstance(b.get("text"), str) and b["text"].strip() and not b["text"].lstrip().startswith(NOT_TYPED):
+            prompts[session] += 1
+            days.add(day_of(t))
+    elif b.get("type") == 2:
+        if not sub:
+            stamps[session].append(t)
+        k = b.get("tokenCount") if isinstance(b.get("tokenCount"), dict) else {}
+        num = lambda key: k.get(key) if isinstance(k.get(key), int) else 0
+        if num("inputTokens") or num("outputTokens"):  # only where Cursor wrote real counts
+            r = requests.setdefault(("cursor", b.get("bubbleId") or str(t)), {
+                "model": model, "sub": sub, "session": session, "t": t, "seen": set(), "price": price_of(model),
+                "input_tokens": num("inputTokens"), "cache_creation_input_tokens": 0,
+                "cache_read_input_tokens": 0, "output_tokens": num("outputTokens")})
+            r["seen"].add(session)
+lines.update(cursor_lines)
+
 reqs = [r for r in requests.values() if sum(r[p] for p in PARTS)]
 total = lambda rows, *parts: sum(r[p] for r in rows for p in (parts or PARTS))
 tokens = total(reqs) or 1
@@ -695,14 +815,15 @@ if mode == "count":
     sys.exit()
 
 worked = [s for s in prompts if prompts[s]]
+counted = lambda value: value if reqs else None  # with no token counts at all, the token numbers are unknown, not 0
 print(json.dumps({
-    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files)), ("Gemini CLI", len(gemini_files)), ("OpenCode", len(opencode_files))) if n},
+    "transcripts_read": {k: n for k, n in (("Claude Code", len(files)), ("Codex CLI", len(codex_files)), ("Gemini CLI", len(gemini_files)), ("OpenCode", len(opencode_files)), ("Cursor", len(cursor_chats))) if n},
     "days_covered": covered,
     "days_with_prompts": min(len(days), covered),
     "sessions": len(worked),
-    "a_month": {"prompts": month(sum(prompts.values())), "tokens": month(tokens), "requests": month(len(reqs)), "lines_written": month(sum(lines.values()))},
-    "cost_split_pct": {"reread": cost_pct("cache_read_input_tokens"), "loaded": cost_pct("input_tokens", "cache_creation_input_tokens"), "written": cost_pct("output_tokens")},
-    "subagent_tokens_pct": pct(total([r for r in reqs if r["sub"]])),
+    "a_month": {"prompts": month(sum(prompts.values())), "tokens": counted(month(tokens)), "requests": counted(month(len(reqs))), "lines_written": month(sum(lines.values()))},
+    "cost_split_pct": None if not reqs else {"reread": cost_pct("cache_read_input_tokens"), "loaded": cost_pct("input_tokens", "cache_creation_input_tokens"), "written": cost_pct("output_tokens")},
+    "subagent_tokens_pct": counted(pct(total([r for r in reqs if r["sub"]]))),
     "median": {
         "context_per_request": median([r["input_tokens"] + r["cache_creation_input_tokens"] + r["cache_read_input_tokens"] for r in reqs]),
         "prompts_per_session": median([prompts[s] for s in worked]),

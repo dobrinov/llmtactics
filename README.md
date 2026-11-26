@@ -78,7 +78,7 @@ come from answers arriving month after month, not from anyone's old history.
 Within the 30 days the assistant counts instead of sampling. The prompt
 points to a script, `survey/measure.py` (served at `/llm-survey.py`, so the
 prompt stays short enough for a fetch tool to return whole), that
-Claude Code, Codex, Gemini CLI or OpenCode downloads into the temporary folder and reads before running it, the one file the survey writes,
+Claude Code, Codex, Gemini CLI, OpenCode or Cursor downloads into the temporary folder and reads before running it, the one file the survey writes,
 and deletes at the end. It has four uses:
 
 - `measure` reads every transcript, including the subagents' (which a
@@ -91,7 +91,10 @@ and deletes at the end. It has four uses:
   hash of its path is matched against the paths the other tools name, and
   when folders are skipped, one it cannot match is skipped too. And
   OpenCode's (`~/.local/share/opencode/storage`): a request is each
-  `step-finish` part, and text OpenCode adds to a prompt is left out;
+  `step-finish` part, and text OpenCode adds to a prompt is left out. And
+  Cursor's chats (`User/globalStorage/state.vscdb`, read only): Cursor keeps
+  no token counts, so the token numbers print `null` when nothing else
+  has them;
 - `read N` prints a page of the prompts the user typed, with links, emails,
   paths, hosts, numbers and anything that looks like a secret masked, so
   that the assistant reads every prompt without reading a password. A

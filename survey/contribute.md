@@ -51,7 +51,7 @@ Work through the steps below in order, starting with step 0.
 Before you read or run anything, tell the user in one short message what
 this survey will read on their machine, and that none of it leaves it:
 
-- the Claude Code, Codex, Gemini CLI and OpenCode transcripts and prompt logs of the last 30 days
+- the Claude Code, Codex, Gemini CLI, OpenCode and Cursor transcripts and prompt logs of the last 30 days
   (or your own tool's history), read through a script that masks links, paths, names,
   numbers and secrets before you see a prompt;
 - instruction files (`CLAUDE.md`, `AGENTS.md` and the like) and settings;
@@ -90,10 +90,11 @@ Where the records usually are:
 | Codex CLI | `~/.codex/sessions/**/*.jsonl` (one file per session, with token counts), `~/.codex/history.jsonl` (every prompt the user typed) |
 | Gemini CLI | `~/.gemini/tmp/*/chats/session-*.json` (one file per session, with token counts), `~/.gemini/tmp/*/logs.json` (every prompt the user typed) |
 | OpenCode | `~/.local/share/opencode/storage/` (`session/`, `message/` and `part/`, one JSON file each, with token counts) |
-| Cursor, Copilot, Windsurf, other IDE agents | whatever chat history or workspace storage you can read |
+| Cursor | `User/globalStorage/state.vscdb` in Cursor's settings folder (a SQLite database: chats and messages, no token counts) |
+| Copilot, Windsurf, other IDE agents | whatever chat history or workspace storage you can read |
 | ChatGPT, Claude, Gemini apps | your past-conversation search and memory tools |
 
-**If you are Claude Code, Codex, Gemini CLI or OpenCode**, download the script into the temporary folder.
+**If you are Claude Code, Codex, Gemini CLI, OpenCode or Cursor**, download the script into the temporary folder.
 It only reads, makes no network requests, and every later step uses it:
 
 ```sh
@@ -130,13 +131,16 @@ Run it four ways:
   match, whether that is enough to report (`qualifies`), and the
   `frequency`, `status` and `cost` to report.
 
-The script reads the history of Claude Code, Codex, Gemini CLI and OpenCode together
+The script reads the history of Claude Code, Codex, Gemini CLI, OpenCode and Cursor together
 (`CLAUDE_CONFIG_DIR` and `CODEX_HOME` move the first two), and `measure`
 says how many transcripts of each it read (`transcripts_read`). It weighs
 each model's tokens as its maker bills them: for OpenAI models an output
 token as 8 and no cache writes; for Gemini 2.5 a cached token as 0.25 and an
 output token as 8, for Gemini 3 as 0.1 and 6. OpenCode runs any provider's
 models: Claude's and Gemini's are weighed as above, all others as OpenAI's.
+Cursor keeps no token counts on the machine: its chats count in prompts,
+sessions and minutes, not in tokens. A number the script prints as `null`
+is unknown: leave that field out.
 
 `measure` counts from the transcripts and leaves out slash commands; `read`
 and `count` go by the prompt log, which has them. Their totals differ a
@@ -306,7 +310,7 @@ are easy to miss. Look for them on purpose, without changing anything:
 - **Review tools:** diff viewers, review bots and review commands the user
   names or pastes output from.
 
-If you are Claude Code, Codex, Gemini CLI or OpenCode, start from the `tools` output of the script: every
+If you are Claude Code, Codex, Gemini CLI, OpenCode or Cursor, start from the `tools` output of the script: every
 tool with `days` above 0, or `open` now, is in use. One that is only
 `installed` is not. Add what the script cannot see (connectors, review tools,
 chat assistants used in a browser) from your history and configuration.
