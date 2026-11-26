@@ -640,22 +640,22 @@ async function handle(req, res) {
   if (p === '/privacy') return html(res, views.privacyPage());
 
   // ---------- admin ----------
-  if (p === '/admin' || p.startsWith('/admin/')) {
+  if (p === '/samodidopipatuk' || p.startsWith('/samodidopipatuk/')) {
     if (!ADMIN_PASSWORD) return privateHtml(res, admin.disabledPage());
-    if (p === '/admin/login') return privateHtml(res, admin.loginPage({ error: url.searchParams.get('error') }));
-    if (!isAdmin(req)) return redirect(res, '/admin/login');
-    if (p === '/admin') {
+    if (p === '/samodidopipatuk/login') return privateHtml(res, admin.loginPage({ error: url.searchParams.get('error') }));
+    if (!isAdmin(req)) return redirect(res, '/samodidopipatuk/login');
+    if (p === '/samodidopipatuk') {
       const status = ['pending', 'flagged', 'accepted', 'rejected'].includes(url.searchParams.get('status')) ? url.searchParams.get('status') : null;
       const page = Math.max(0, Number(url.searchParams.get('page')) || 0);
       const [counts, rows] = await Promise.all([store.statusCounts(), store.listContributions({ status, offset: page * 50 })]);
       return privateHtml(res, admin.listPage({ counts, rows, status, page }));
     }
-    if (p === '/admin/analysis') return privateHtml(res, admin.analysisPage({ counts: await store.statusCounts(), base: baseUrl(req) }));
-    if (p === '/admin/totals') {
+    if (p === '/samodidopipatuk/analysis') return privateHtml(res, admin.analysisPage({ counts: await store.statusCounts(), base: baseUrl(req) }));
+    if (p === '/samodidopipatuk/totals') {
       const [state, check] = await Promise.all([store.totalsState(), store.checkTotals()]);
       return privateHtml(res, admin.totalsPage({ state, check, rebuilt: url.searchParams.has('rebuilt') }));
     }
-    const one = m(/^\/admin\/c\/(\d{1,18})$/);
+    const one = m(/^\/samodidopipatuk\/c\/(\d{1,18})$/);
     if (one) {
       const c = await store.contribution(one[1]);
       return c ? privateHtml(res, admin.detailPage({ c })) : html(res, views.notFoundPage(), 404);
@@ -746,31 +746,31 @@ async function post(req, res, url, p, m) {
   }
 
   // ---------- admin ----------
-  if (p === '/admin/login') {
+  if (p === '/samodidopipatuk/login') {
     if (!ADMIN_PASSWORD) return send(res, 404, 'Not found', 'text/plain');
     const wait = guessesLeft(req, 'admin-login', 5, 15 * 60_000);
     if (wait) return tooMany(res, wait);
     const form = await readForm(req);
     if (!safeEqual(String(form.password || ''), ADMIN_PASSWORD)) {
       wrongGuess(req, 'admin-login', 15 * 60_000);
-      return redirect(res, '/admin/login?error=1');
+      return redirect(res, '/samodidopipatuk/login?error=1');
     }
     const value = signer.sign(`admin:${Date.now() + 12 * 3600_000}:${fingerprint(hashOfAdmin)}`);
-    return redirect(res, '/admin', { 'Set-Cookie': cookie('admin', value, { maxAge: 12 * 3600, secure: SECURE }) });
+    return redirect(res, '/samodidopipatuk', { 'Set-Cookie': cookie('admin', value, { maxAge: 12 * 3600, secure: SECURE }) });
   }
-  if (p === '/admin/logout') return redirect(res, '/', { 'Set-Cookie': cookie('admin', '', { maxAge: 0, secure: SECURE }) });
-  if (p.startsWith('/admin/')) {
+  if (p === '/samodidopipatuk/logout') return redirect(res, '/', { 'Set-Cookie': cookie('admin', '', { maxAge: 0, secure: SECURE }) });
+  if (p.startsWith('/samodidopipatuk/')) {
     if (!isAdmin(req)) return send(res, 403, 'Forbidden', 'text/plain');
-    if (p === '/admin/totals/rebuild') {
+    if (p === '/samodidopipatuk/totals/rebuild') {
       await store.rebuildTotals();
-      return redirect(res, '/admin/totals?rebuilt');
+      return redirect(res, '/samodidopipatuk/totals?rebuilt');
     }
-    const act = m(/^\/admin\/c\/(\d{1,18})\/(accept|reject|flag|pending|delete)$/);
+    const act = m(/^\/samodidopipatuk\/c\/(\d{1,18})\/(accept|reject|flag|pending|delete)$/);
     if (act) {
       const [, id, action] = act;
-      if (action === 'delete') { await store.deleteContribution(id); return redirect(res, '/admin'); }
+      if (action === 'delete') { await store.deleteContribution(id); return redirect(res, '/samodidopipatuk'); }
       await store.setStatus(id, { accept: 'accepted', reject: 'rejected', flag: 'flagged', pending: 'pending' }[action]);
-      return redirect(res, `/admin/c/${id}`);
+      return redirect(res, `/samodidopipatuk/c/${id}`);
     }
   }
 
@@ -785,7 +785,7 @@ const server = http.createServer((req, res) => {
 });
 server.listen(PORT, () => {
   const base = PUBLIC_URL || `http://localhost:${PORT}`;
-  console.log(`${SITE}  ${base}${ADMIN_PASSWORD ? `\nadmin            ${base}/admin` : '\nadmin            disabled (set ADMIN_PASSWORD)'}`);
+  console.log(`${SITE}  ${base}${ADMIN_PASSWORD ? `\nadmin            ${base}/samodidopipatuk` : '\nadmin            disabled (set ADMIN_PASSWORD)'}`);
 });
 // Stop taking requests, let the ones in progress finish, then close the
 // database. Connections still open after 5 seconds are cut.
