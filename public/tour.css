@@ -76,7 +76,8 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .quad.q2 { left: -8px; bottom: -8px; color: var(--q2); } .quad.q3 { right: -8px; bottom: -8px; color: var(--q3); }
 .quad[aria-pressed="true"] { border-color: currentColor; background: #fff; }
 /* Sizes are set for a 560px radar and scale with it, so the placement (lib/radar.js) keeps dots apart at any width. */
-.hdot { --d: calc(var(--s) * 100cqw / 560px); position: absolute; z-index: 3; width: var(--d); height: var(--d); margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2); padding: 0; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); transition: transform 0.12s; }
+/* Never under 10px, however small the radar or crowded the quadrant: a smaller dot is all border and can't be tapped. */
+.hdot { --d: max(10px, calc(var(--s) * 100cqw / 560px)); position: absolute; z-index: 3; width: var(--d); height: var(--d); margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2); padding: 0; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); transition: transform 0.12s; }
 .hdot:hover, .hdot:focus-visible { transform: scale(1.2); z-index: 6; }
 .hdot.on { transform: scale(1.25); z-index: 7; outline: 3px solid var(--ink); outline-offset: 2px; }
 .hdot.q0 { background: var(--q0); } .hdot.q1 { background: var(--q1); } .hdot.q2 { background: var(--q2); } .hdot.q3 { background: var(--q3); }
@@ -118,7 +119,8 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
   .tradar-wrap { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 0 40px; }
   .tradar-wrap .tradar { grid-column: 2; grid-row: 1; width: min(560px, calc(100svh - 200px)); }
   /* Never taller than the radar: a longer list scrolls in place, so the radar stays put. */
-  .tlegend { grid-column: 1; grid-row: 1; justify-self: end; width: 260px; grid-template-columns: 1fr; gap: 12px; max-height: min(560px, calc(100svh - 200px)); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .tlegend { grid-column: 1; grid-row: 1; justify-self: end; width: 260px; grid-template-columns: 1fr; gap: 10px; max-height: min(560px, calc(100svh - 200px)); overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
+  .tleg-head { line-height: 1.1; }
   .tleg-row { min-height: 28px; }
 }
 
