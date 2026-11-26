@@ -351,7 +351,6 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .story-card > span.muted { margin-top: auto; color: #64748b; font-size: 13px; }
 .story-tools { justify-content: center; }
 .story-uses { width: auto; max-width: 720px; margin: 0; }
-.tcard-more { font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
 
 /* ---------- small screens ---------- */
 @media (max-width: 760px) {
