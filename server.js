@@ -49,12 +49,13 @@ function baseUrl(req) {
   return `http://${req.headers.host || `localhost:${PORT}`}`;
 }
 
+const STATS = 'https://stats.aparatnata.com';
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
   'X-Frame-Options': 'DENY',
   'Cross-Origin-Opener-Policy': 'same-origin',
-  'Content-Security-Policy': `default-src 'self'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'${turnstile.on ? ` ${TURNSTILE}; frame-src ${TURNSTILE}` : ''}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
+  'Content-Security-Policy': `default-src 'self'; style-src 'self' https://fonts.googleapis.com; style-src-attr 'unsafe-inline'; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self' ${STATS}; script-src 'self' ${STATS}${turnstile.on ? ` ${TURNSTILE}; frame-src ${TURNSTILE}` : ''}; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
   ...(SECURE ? { 'Strict-Transport-Security': 'max-age=31536000' } : {}),
 };
 
