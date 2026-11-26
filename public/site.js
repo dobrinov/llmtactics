@@ -109,6 +109,8 @@ if (deck) {
   // The tour's top bar names the slide, and the lens links open the same slide.
   const where = document.querySelector('[data-where]');
   const lensLinks = [...document.querySelectorAll('[data-lens-link]')];
+  // No Take part link while the Take part slide is showing.
+  const joinLink = document.querySelector('.tour-join');
   const names = dots.map((d) => d.querySelector('.tip')?.textContent ?? '');
   let current = 0;
 
@@ -125,6 +127,7 @@ if (deck) {
     if (i !== current) rewind(slides[current]);
     current = i;
     dots.forEach((d, k) => (k === i ? d.setAttribute('aria-current', 'step') : d.removeAttribute('aria-current')));
+    joinLink?.classList.toggle('here', slides[i].id === 'join');
     if (where) where.textContent = `${String(i + 1).padStart(2, '0')} · ${names[i]}`;
     for (const a of lensLinks) a.href = `${a.getAttribute('href').split('#')[0]}${i ? `#${slides[i].id}` : ''}`;
     for (const a of arrows) {

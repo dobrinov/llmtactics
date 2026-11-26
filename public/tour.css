@@ -19,6 +19,8 @@
 .lens a:hover { color: var(--ink); }
 .tour-join { font: 600 14px var(--sans); color: var(--q1); text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; white-space: nowrap; }
 .tour-join:hover { color: #7c2d12; }
+/* Hidden on the Take part slide itself; it keeps its space so the bar holds still. */
+.tour-join.here { visibility: hidden; }
 .back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font: 600 14px var(--sans); text-decoration: none; color: var(--ink); }
 .tour-side { position: fixed; top: 50%; z-index: 15; width: 48px; height: 48px; margin-top: -24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; border: 1px solid #e2e8f0; background: #fff; color: var(--ink); }
 .tour-side:hover { border-color: var(--ink); color: var(--ink); }
@@ -213,6 +215,8 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .in-tag.all { background: var(--t0); color: #1e3a8a; } .in-tag.co { background: var(--t1); color: #7c2d12; }
 .ask { font: 500 14px var(--sans); color: #64748b; border-bottom: 1px dashed #94a3b8; cursor: help; padding: 6px 0; }
 .ask .tip { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
+/* On the Take part slide the tip sits near the bottom, so it opens upward. */
+.tjoin .ask .tip { top: auto; bottom: calc(100% + 8px); }
 /* Links in an open tip can be clicked; a hidden tip lets clicks through. */
 .ask:hover > .tip, .ask:focus-within > .tip { pointer-events: auto; }
 .foot-line a { color: inherit; }
