@@ -320,6 +320,39 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .with-list a > span:last-child { display: flex; flex-direction: column; }
 .with-list .tc { cursor: inherit; }
 
+/* ---------- story decks: one tactic or one tool (/tactics/<id>, /tools/<slug>) ---------- */
+.story .tour-bar .back { justify-self: start; }
+.story .intro-inner .tc.huge { margin-bottom: -8px; }
+.story .intro-inner .figures { justify-content: center; text-align: center; }
+.story .intro-inner .figures > span { align-items: center; }
+.story .slide.tslide:not(.intro):not(.tjoin) { justify-content: safe center; }
+.story-how { width: min(1040px, 100%); display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 40px; align-items: start; }
+.story-pitch { font-size: clamp(17px, 1.4vw, 20px); line-height: 1.6; color: var(--text); margin: 0; }
+.story-pitch.narrow { max-width: 720px; text-align: center; }
+.story-facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px 16px; margin: 24px 0 0; font-size: 15px; }
+.story-facts dt { font: 600 12px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; padding-top: 3px; }
+.story-facts dd { margin: 0; color: #334155; }
+.story-steps { padding: 24px; border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 14px; }
+.story-steps h3 { margin: 0; }
+.story-steps ol { margin: 0; padding-left: 22px; display: grid; gap: 10px; font-size: 16px; }
+.story-example { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: start; padding: 14px 16px; border-radius: 14px; background: #f1f5f9; }
+.story-example .label { grid-column: 1 / -1; font-size: 11px; }
+.story-example p { margin: 0; font: 500 14px/1.55 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+.story .tradar-wrap { margin: 0; }
+.story a.hdot { display: block; }
+.story-chart { width: min(720px, 100%); }
+.story-months { height: min(280px, 40svh); }
+.month-cols i.q0 { background: var(--q0); } .month-cols i.q1 { background: var(--q1); } .month-cols i.q2 { background: var(--q2); } .month-cols i.q3 { background: var(--q3); }
+.story-cards { width: min(1040px, 100%); display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 320px)); justify-content: center; gap: 16px; }
+.story-card { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 22px; border-radius: 20px; background: #fff; border: 1px solid #e2e8f0; text-decoration: none; color: var(--ink); transition: border-color 0.15s, transform 0.15s; }
+.story-card:hover { border-color: var(--ink); transform: translateY(-2px); color: var(--ink); }
+.story-card strong { font: 700 20px var(--head); }
+.story-card > span:not(.badge) { color: #475569; font-size: 15px; }
+.story-card > span.muted { margin-top: auto; color: #64748b; font-size: 13px; }
+.story-tools { justify-content: center; }
+.story-uses { width: auto; max-width: 720px; margin: 0; }
+.tcard-more { font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+
 /* ---------- small screens ---------- */
 @media (max-width: 760px) {
   .tour-bar { grid-template-columns: 1fr auto; height: auto; min-height: 60px; padding-top: 4px; padding-bottom: 4px; }
@@ -339,11 +372,16 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
   .tool-tile { width: 100%; }
   .tool-group li { flex: 1 1 100%; }
   .tool-detail-head { flex-direction: column; align-items: flex-start; }
+  .story-how { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+  .story-bar .back { grid-column: 1; grid-row: 1; }
+  .story-bar .tour-right { grid-column: 2; grid-row: 1; }
+  .story-facts { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .story-facts dd { margin-bottom: 10px; }
   .tcard { inset: auto 16px 16px 16px; width: auto; }
   .tradar { width: min(100%, 440px); }
   .seg .tip { left: 50%; top: auto; bottom: calc(100% + 4px); transform: translateX(-50%); }
 }
-@media (prefers-reduced-motion: reduce) { .hdot, .join-card, .tdot-nav i { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .hdot, .join-card, .story-card, .tdot-nav i { transition: none; } }
 
 /* ---------- take part: one centred screen per step (lib/flow.js) ---------- */
 .flow { min-height: 100svh; display: flex; flex-direction: column; background: #f8fafc; overflow-x: clip; }

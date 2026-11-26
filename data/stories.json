@@ -1,0 +1,175 @@
+{
+  "_comment": "The words on the tactic pages (/tactics/<id>) and the World tool pages (/tools/<slug>). Tactics are keyed by their catalog id, tools by their name in data/tools.json, in lower case. pitch: one short paragraph. how: three steps (how_title replaces 'How to do it'). example: one line someone could type. pairs: other tactics it goes with; tools: tools from tools.json that help with it; tactics (on a tool): tactics it helps with. These links are the site's suggestions, not counted from answers. A tool without an entry here gets a page that search engines are asked to skip.",
+  "tactics": {
+    "paste-the-evidence": {
+      "pitch": "When something breaks, your summary of the error is already a guess. Paste the stack trace, the failing test output or the log lines as they are, and the assistant starts from what actually happened: the exact message, the file and line, the order of events. A summary drops exactly those details.",
+      "how": ["Copy the whole error, not only its last line.", "Add one sentence on what you were doing when it happened.", "Ask for the cause before the fix."],
+      "example": "Here is the full output of the failing run. What is the cause? Don't change anything yet.",
+      "pairs": ["screenshot-as-brief", "tests-as-proof"]
+    },
+    "standing-instructions": {
+      "pitch": "Every session starts with no memory of the last one. A short file of rules and project facts (how to run the tests, which folders to leave alone, the words your team uses) gives every session the same start. Most coding agents read such a file on their own, such as CLAUDE.md or AGENTS.md.",
+      "how": ["Start the file the third time you give the same correction.", "Keep it short: commands, conventions, things to avoid.", "Remove a rule once it stops being true."],
+      "example": "Add to the project instructions: run the tests before saying a change is done.",
+      "pairs": ["saved-prompts", "session-handoff"],
+      "tools": ["Claude Code", "Cursor", "Codex CLI"]
+    },
+    "screenshot-as-brief": {
+      "pitch": "A screen is hard to describe and easy to show. A screenshot with one line, such as “the button should line up with the field above”, says more than a paragraph about margins. An assistant that reads images sees the wrong state, the overflow or the crooked row for itself.",
+      "how": ["Capture only the part that is wrong.", "Write one line on what it should look like instead.", "Send a second screenshot after the fix to confirm it."],
+      "example": "[screenshot] The total wraps onto two lines on a phone. Keep it on one.",
+      "pairs": ["numbered-punch-list", "paste-the-evidence"],
+      "tools": ["agent-browser"]
+    },
+    "numbered-punch-list": {
+      "pitch": "Reviewing a screen or a diff usually turns up several small things at once. Sending them one per turn is slow, and the fifth one gets forgotten. A numbered list goes in one message and gets fixed in one pass, and the numbers make it easy to say “3 is still wrong”.",
+      "how": ["Collect everything you noticed before you write.", "One point per number, one line each.", "Answer about the result by number."],
+      "example": "1) Rename the button to Save. 2) Drop the second divider. 3) Show the date as 26 Nov.",
+      "pairs": ["screenshot-as-brief", "diff-review-gate"],
+      "tools": ["Diffity"]
+    },
+    "plan-before-code": {
+      "pitch": "The costliest mistakes in a large change come from a wrong assumption at the start. Ask for a written plan first: which files change, in what order, and what stays as it is. Reading a plan takes a minute and correcting it takes a sentence. Unpicking the same mistake from finished code takes far longer.",
+      "how": ["Ask for a plan, and say not to change anything yet.", "Correct the plan where it guessed wrong.", "Then let it build, one step at a time."],
+      "example": "Before changing anything, write a plan: the files you would touch and why. Wait for my OK.",
+      "pairs": ["options-then-pick", "tests-as-proof"],
+      "tools": ["Claude Code", "Cursor"]
+    },
+    "clean-slate": {
+      "pitch": "A long session drags its history along: old decisions, abandoned approaches, files that no longer matter. That context leaks into the next task and quietly steers it. Starting fresh for each task keeps the assistant on what is in front of it, and is usually faster and cheaper too.",
+      "how": ["Finish or park the task at hand.", "Clear the conversation, or open a new session.", "Start the next task with only what it needs."],
+      "example": "New session: fix the date format on the invoice page. Nothing from before applies.",
+      "pairs": ["session-handoff", "standing-instructions"]
+    },
+    "options-then-pick": {
+      "pitch": "When the goal is clear but the approach is not, the first idea tends to win only because it came first. Ask for two or three options with their trade-offs, labelled A, B and C. Picking one is quick, and you see the choice being made instead of finding it in the code later.",
+      "how": ["Ask for options, not a solution.", "Ask what each one costs: effort, risk, what it rules out.", "Answer with a letter, and any change to it."],
+      "example": "Give me three ways to cache this, with their trade-offs, as A, B and C. Don't build yet.",
+      "pairs": ["plan-before-code", "parallel-agents"]
+    },
+    "parallel-agents": {
+      "pitch": "Some work splits cleanly: a search across several parts of a codebase, independent fixes, separate research questions. With one agent per part you wait for the slowest one, not for all of them in a row. Each agent's context stays small and on topic, and you merge the results.",
+      "how": ["Split the work into parts that don't touch each other.", "Give each agent its own brief and, for code, its own branch or worktree.", "Review the results and merge them yourself."],
+      "example": "Run three agents at once, one per service, each listing where it reads its settings.",
+      "pairs": ["second-reviewer", "clean-slate"],
+      "tools": ["cmux", "tmux", "T3 Code"]
+    },
+    "diff-review-gate": {
+      "pitch": "Generated code looks right more often than it is right. A person reading the diff before anything is kept catches the confident mistake, the deleted line nobody asked for and the change in the file next door. It is the simplest check there is, and most other checks lean on it.",
+      "how": ["Read the whole diff, not a summary of it.", "Ask about anything you can't explain.", "Keep only what you would have been happy to write yourself."],
+      "example": "Show me the diff before you commit, and explain the change to the settings file.",
+      "pairs": ["tests-as-proof", "second-reviewer"],
+      "tools": ["Diffity"]
+    },
+    "tests-as-proof": {
+      "pitch": "“Done” and “fixed” are claims; a passing test run is evidence. Before you accept a change, ask for the tests to run and the output to be attached, and for a new test that fails before the fix and passes after it. A promise becomes something you can check in seconds.",
+      "how": ["Ask for a test that reproduces the bug first.", "Accept the fix only with the passing run attached.", "Keep the test, so the bug stays fixed."],
+      "example": "Write a failing test for this bug, then fix it and paste the test output.",
+      "pairs": ["diff-review-gate", "paste-the-evidence"]
+    },
+    "second-reviewer": {
+      "pitch": "The agent that wrote a change is the worst placed to review it: it shares every assumption it made. A separate agent or another model, given only the diff and the goal, reads it fresh and finds the missed edge case, the unhandled error and the test that tests nothing.",
+      "how": ["Use a new session, or another model, for the review.", "Give it the diff and the goal, not the conversation.", "Have each point answered or fixed."],
+      "example": "Review this diff as a sceptical senior engineer. Real bugs only, most serious first.",
+      "pairs": ["diff-review-gate", "parallel-agents"],
+      "tools": ["Codex CLI", "Gemini CLI"]
+    },
+    "blind-accept": {
+      "pitch": "Accepting changes without reading them happens under time pressure, on small edits, late in the day. It is on the radar because people do it, not because anyone recommends it. Most of the time nothing goes wrong, and that is the risk: the one change that matters looks like all the others.",
+      "when_title": "When it happens",
+      "problem_title": "What it risks",
+      "how_title": "If you do it anyway",
+      "how": ["Keep it to edits you could undo in seconds.", "Let tests or a second reviewer read what you don't.", "Read every change that will ship."],
+      "pairs": ["diff-review-gate", "tests-as-proof"]
+    },
+    "hands-on-git": {
+      "pitch": "Once a change is reviewed, what is left is routine: the commit message, the push, the pull request and its description. Letting the assistant do it saves the busywork, and it writes the description from the change it has just made. You keep the decisions; it does the typing.",
+      "how": ["Review the change first.", "Let it commit, with a message that says why and not only what.", "Read the pull request before you ask anyone else to."],
+      "example": "Commit this, push the branch and open a pull request with a short description.",
+      "pairs": ["diff-review-gate", "saved-prompts"],
+      "tools": ["Claude Code", "GitHub Copilot"]
+    },
+    "saved-prompts": {
+      "pitch": "A prompt typed three times is a command waiting for a name. Saved as a slash command, a skill or a snippet, it runs the same way every time instead of drifting a little with each retelling. Teams share them, so a good way of doing something spreads.",
+      "how": ["Notice the instructions you keep retyping.", "Save them under a short name.", "Improve the saved version, not the next retelling."],
+      "example": "/release-notes: sum up the pull requests merged since the last release.",
+      "pairs": ["standing-instructions", "hands-on-git"],
+      "tools": ["Claude Code"]
+    },
+    "tool-bridge": {
+      "pitch": "A lot of work starts somewhere else: a ticket, a chat thread, an alert, a design. Copying that in by hand is slow and loses detail. Connectors such as MCP servers let the assistant read the ticket, the thread or the logs itself, and update them when the work is done.",
+      "how": ["Connect the tools your tasks usually start from.", "Point at the source: the ticket number, the link to the thread.", "Decide what it may only read and what it may change."],
+      "example": "Read ticket PAY-142 and the thread linked from it, then propose a fix.",
+      "pairs": ["session-handoff", "hands-on-git"],
+      "tools": ["MCP connectors", "agent-browser"]
+    },
+    "session-handoff": {
+      "pitch": "Work that runs over several days loses its thread each time a session ends. A short note at the end (what is done, what is next, what was decided and why) lets the next session, or a colleague, carry on from there instead of working it all out again.",
+      "how": ["Before you stop, ask for a handoff note.", "Keep it where the next session will look: the repository or the ticket.", "Start the next session by reading it."],
+      "example": "Write a handoff note: what is done, what is next, open questions, and decisions with their reasons.",
+      "pairs": ["standing-instructions", "clean-slate"]
+    }
+  },
+  "tools": {
+    "claude code": {
+      "pitch": "Claude Code works in the terminal and in editors. It reads the codebase, runs commands and tests, and makes changes across files, asking first before anything you haven't allowed. Many tactics on the radar grew up around agents like it: a plan before code, standing instructions in CLAUDE.md, saved commands, agents working in parallel.",
+      "tactics": ["plan-before-code", "standing-instructions", "saved-prompts", "parallel-agents"]
+    },
+    "claude": {
+      "pitch": "Claude is Anthropic's chat assistant, on the web, the desktop and phones. People use it to think a problem through, draft and review writing, read documents and images, and work on code in a conversation rather than inside a codebase.",
+      "tactics": ["screenshot-as-brief", "options-then-pick"]
+    },
+    "chatgpt": {
+      "pitch": "ChatGPT is OpenAI's chat assistant, on the web, the desktop and phones. People use it for questions, writing, analysis and code in a conversation, and it can read the files and images they give it.",
+      "tactics": ["paste-the-evidence", "options-then-pick"]
+    },
+    "cursor": {
+      "pitch": "Cursor is a code editor with an AI assistant at its centre. It suggests code as you type, answers questions about the codebase, and has an agent that makes changes across files. Project rules give each session the same start.",
+      "tactics": ["standing-instructions", "plan-before-code", "diff-review-gate"]
+    },
+    "github copilot": {
+      "pitch": "GitHub Copilot began as suggestions while you type. It now also has chat in the editor, and an agent on GitHub that can take an issue, make the change and open a pull request for review.",
+      "tactics": ["hands-on-git", "diff-review-gate"]
+    },
+    "codex cli": {
+      "pitch": "Codex CLI is OpenAI's open-source coding agent for the terminal. It reads the repository, runs commands and edits files, with settings for how much it may do without asking. It takes project instructions from AGENTS.md.",
+      "tactics": ["standing-instructions", "second-reviewer"]
+    },
+    "gemini": {
+      "pitch": "Gemini is Google's chat assistant, on the web and phones. People use it for questions, writing and code in a conversation, and alongside Google's own apps.",
+      "tactics": ["options-then-pick"]
+    },
+    "gemini cli": {
+      "pitch": "Gemini CLI is Google's open-source coding agent for the terminal. It reads the project, runs commands and edits files, and takes project instructions from GEMINI.md.",
+      "tactics": ["standing-instructions", "second-reviewer"]
+    },
+    "windsurf": {
+      "pitch": "Windsurf is a code editor built around an AI agent. The agent plans and makes changes across files, and the editor suggests code as you type.",
+      "tactics": ["plan-before-code", "diff-review-gate"]
+    },
+    "mcp connectors": {
+      "pitch": "The Model Context Protocol is an open standard for connecting assistants to other tools. An MCP server for a tracker, a chat app, a database or a log store lets the assistant read from it and act in it directly, instead of you copying things across by hand.",
+      "tactics": ["tool-bridge"]
+    },
+    "tmux": {
+      "pitch": "tmux keeps several terminal sessions in one window, and keeps them running when you close it. People who run coding agents in the terminal use it to keep several going side by side and come back to them later.",
+      "tactics": ["parallel-agents", "session-handoff"]
+    },
+    "cmux": {
+      "pitch": "cmux is a terminal app for running many coding agents side by side. It tells you when one of them needs you, so parallel work does not mean checking every window in turn.",
+      "tactics": ["parallel-agents"]
+    },
+    "t3 code": {
+      "pitch": "T3 Code puts several coding agents behind one window, so you can start them, follow them and move between them in one place.",
+      "tactics": ["parallel-agents"]
+    },
+    "diffity": {
+      "pitch": "Diffity is a diff viewer for reading an agent's changes and commenting on them line by line, then handing the comments back to the agent to work through.",
+      "tactics": ["diff-review-gate", "numbered-punch-list"]
+    },
+    "agent-browser": {
+      "pitch": "agent-browser is a command line browser made for AI agents. With it an agent can open a page, click through it and read what it shows, so it can check its own changes to a website instead of asking you to look.",
+      "tactics": ["screenshot-as-brief", "tool-bridge"]
+    }
+  }
+}

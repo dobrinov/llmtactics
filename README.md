@@ -22,7 +22,8 @@ npm test                  # needs the llmpatterns_test database
 | URL | What |
 | --- | --- |
 | `/` | The tour, seven slides: intro, tactics (the radar), setups, models over time, coding agents over time, where answers came from, and taking part |
-| `/tools`, `/tools/<tool>` | Every tool people named, by kind, and one tool's page: its share, six months of it, and what people use it with. Opened from the Setups slide |
+| `/tactics/<id>` | One tactic as a short deck for people arriving from a search: how it works, where it sits on everyone's radar, six months of it, what goes with it, and the way into the whole presentation. Words in `data/stories.json` |
+| `/tools`, `/tools/<tool>` | Every tool people named, by kind, and one tool's page: its share, six months of it, and what people use it with. Opened from the Setups slide. Under World a tool's page is a short deck like a tactic's; only tools with words in `data/stories.json` are offered to search engines |
 | `/contribute` | Just me: one line to paste, then a step at a time as the assistant fetches the prompt and its answer arrives. `?for=company` starts a company page: name it, invite colleagues, reach 5 people |
 | `/u/<id>` | The tour through one person's lens: their habits, setup and models among everyone's. `/u/<id>/tools` likewise |
 | `/c/<id>` | The tour through a company's lens, next to everyone. Until 5 people's answers have been reviewed: how many have answered. `/c/<id>/tools` likewise |

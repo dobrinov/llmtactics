@@ -5,9 +5,9 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
-import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS, knownTools } from './lib/shape.js';
+import { cleanContribution, catalog, catalogById, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS, knownTools } from './lib/shape.js';
 import { MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
-import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor, setLogos, myTools } from './lib/tour.js';
+import { tourPage, toolsIndexPage, toolPage, tacticPage, toolStory, toolSlug, whoFor, setLogos, myTools } from './lib/tour.js';
 import * as flow from './lib/flow.js';
 import { numbersOf, toolDetailOf, delta } from './lib/aggregate.js';
 import { monthKey } from './lib/stats.js';
@@ -536,7 +536,8 @@ async function handle(req, res) {
   }
   if (p === '/sitemap.xml') {
     const t = await tourData(req, {});
-    const paths = ['/', '/tools', ...t.all.tools.map((x) => `/tools/${toolSlug(x.name)}`), '/privacy'];
+    // Tool pages only for tools with words of their own (data/stories.json); the rest say noindex.
+    const paths = ['/', ...catalog.map((x) => `/tactics/${x.id}`), '/tools', ...t.all.tools.filter((x) => toolStory(x.name)).map((x) => `/tools/${toolSlug(x.name)}`), '/privacy'];
     const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${paths.map((x) => `  <url><loc>${baseUrl(req)}${x}</loc></url>`).join('\n')}\n</urlset>\n`;
     return send(res, 200, body, 'application/xml; charset=utf-8', { 'Cache-Control': 'public, max-age=3600' });
   }
@@ -589,6 +590,13 @@ async function handle(req, res) {
     const inviter = t.tookPart ? null : await store.profileByInvite(code);
     if (inviter) t.invite = { name: inviter.name, join: `/contribute?from=${code}` };
     return privateHtml(res, tourPage(t));
+  }
+  // One tactic's deck, through everyone's numbers. The radar is where they all are.
+  if (p === '/tactics') return redirect(res, '/#tactics');
+  const tacticAt = m(/^\/tactics\/([a-z0-9-]{1,60})$/);
+  if (tacticAt) {
+    const tactic = catalogById.get(tacticAt[1]);
+    return tactic ? privateHtml(res, tacticPage(await tourData(req, {}), tactic)) : html(res, views.notFoundPage(), 404);
   }
   const toolsAt = m(/^\/tools(?:\/([a-z0-9-]{1,80}))?$/);
   if (toolsAt) return toolsRoute(res, await tourData(req, {}), toolsAt[1]);
