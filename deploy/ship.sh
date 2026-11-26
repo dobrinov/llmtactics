@@ -28,13 +28,19 @@ git archive --format=tar "$REF" | ssh -i "$KEY" -o BatchMode=yes "$HOST" "
   echo '==> starting'
   docker compose up -d --quiet-pull
   echo '==> waiting for health'
+  # The new container is found by the commit on its image, not by name:
+  # Compose sometimes starts it under a temporary name (<id>_llmtactics-web).
   for i in \$(seq 1 60); do
-    status=\$(docker inspect -f '{{.State.Health.Status}}' llmtactics-web 2>/dev/null || echo starting)
+    id=\$(docker ps -q --filter label=commit=$SHA --filter name=llmtactics-web | head -n1)
+    status=\$( [ -n \"\$id\" ] && docker inspect -f '{{.State.Health.Status}}' \"\$id\" 2>/dev/null || echo starting)
     [ \"\$status\" = healthy ] && { echo '    healthy'; break; }
     [ \"\$status\" = unhealthy ] && { echo '    UNHEALTHY: docker compose -f /opt/apps/llmtactics/compose.yaml logs web'; exit 1; }
     sleep 3
   done
   [ \"\$status\" = healthy ] || { echo '    not healthy after 3 minutes'; exit 1; }
+  # Give a temporarily named container its usual name back.
+  name=\$(docker inspect -f '{{.Name}}' \"\$id\")
+  [ \"\$name\" = /llmtactics-web ] || { docker rename \"\$id\" llmtactics-web && echo \"    renamed \$name to llmtactics-web\"; }
   docker image prune -f >/dev/null
   echo '==> live: $SHA'
 "
