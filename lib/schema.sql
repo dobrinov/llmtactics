@@ -121,6 +121,10 @@ CREATE TABLE IF NOT EXISTS waits (
   contribution_id bigint REFERENCES contributions(id) ON DELETE SET NULL,
   claimed boolean NOT NULL DEFAULT false
 );
+-- A wait a browser opened for a new page: only that browser (its `waits`
+-- cookie) may claim the page when the answer arrives. Waits fetched straight
+-- by an assistant, and older ones, may be claimed by the first browser.
+ALTER TABLE waits ADD COLUMN IF NOT EXISTS claim_needs_grant boolean NOT NULL DEFAULT false;
 
 -- The address the answer's page will get, chosen when the prompt is shown,
 -- so the prompt can be fetched from /u/<id>/contribute.md before the page exists.

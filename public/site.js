@@ -70,6 +70,7 @@ if (waitEl) {
     if (edit && body.page) { edit.href = `${body.page}/edit`; edit.hidden = false; }
     if (body.code) {
       flowPage.querySelector('[data-flow-code]').textContent = body.code;
+      flowPage.querySelector('[data-flow-code-copy]').dataset.copy = body.code;
       flowPage.querySelector('[data-flow-keep]').hidden = false;
     }
     say('');

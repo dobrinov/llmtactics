@@ -59,14 +59,15 @@ function readBody(req) {
   return new Promise((resolve, reject) => {
     let size = 0;
     const chunks = [];
+    const tooLarge = () => Object.assign(new Error(`The body is larger than ${MAX_BODY / 1024} KB.`), { status: 413 });
+    // Too large: answer at once, and let the rest of the body drain unread, so
+    // the client gets the error instead of a dropped connection.
+    if (Number(req.headers['content-length']) > MAX_BODY) { req.resume(); return reject(tooLarge()); }
     req.on('data', (c) => {
       size += c.length;
-      if (size > MAX_BODY) {
-        reject(Object.assign(new Error('Body too large.'), { status: 413 }));
-        req.destroy();
-      } else chunks.push(c);
+      if (size > MAX_BODY) { chunks.length = 0; reject(tooLarge()); } else chunks.push(c);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => { if (size <= MAX_BODY) resolve(Buffer.concat(chunks).toString('utf8')); });
     req.on('error', reject);
   });
 }
@@ -86,6 +87,18 @@ function limited(req, bucket, max, windowMs = 60_000) {
   return h.n > max ? Math.ceil((h.start + windowMs - t) / 1000) : 0;
 }
 setInterval(() => { const t = Date.now(); for (const [k, h] of hits) if (t - h.start > 3600_000) hits.delete(k); }, 60_000).unref();
+// Limits on guessing: only wrong attempts count, so colleagues behind one
+// address who know the password are never locked out. Seconds to wait, or 0.
+function guessesLeft(req, bucket, max, windowMs) {
+  const h = hits.get(`${bucket}:${clientIp(req)}`);
+  if (!h || Date.now() - h.start > windowMs) return 0;
+  return h.n >= max ? Math.ceil((h.start + windowMs - Date.now()) / 1000) : 0;
+}
+const wrongGuess = (req, bucket, windowMs) => limited(req, bucket, Infinity, windowMs);
+const tooMany = (res, retry) => send(res, 429, `Too many attempts. Try again in ${Math.max(1, Math.ceil(retry / 60))} minute${retry > 60 ? 's' : ''}.`, 'text/plain; charset=utf-8', { 'Retry-After': String(retry) });
+const tooManyRequests = (res, retry) => send(res, 429, 'Too many requests. Try again in a minute.', 'text/plain; charset=utf-8', { 'Retry-After': String(retry) });
+// Where a password or code form sends the person back to: a path of the same page only.
+const backTo = (next, kind, id, fallback) => (typeof next === 'string' && new RegExp(`^/${kind}/${id}(/(edit|contribute|invite|tools(/[a-z0-9-]{1,80})?))?$`).test(next) ? next : fallback);
 
 // Form posts must come from this site.
 function sameOrigin(req) {
@@ -139,6 +152,16 @@ function grantCookie(req, add = [], remove = () => false) {
   const list = [...new Set([...grantsOf(req).filter((g) => freshCode(g) && !remove(g)), ...add])].slice(-MAX_GRANTS);
   return cookie('access', signer.sign(Buffer.from(JSON.stringify(list)).toString('base64url')), { maxAge: 365 * 864e2, secure: SECURE });
 }
+
+// The new-page waits this browser opened (its last few), so only it can claim
+// the page when the answer arrives. Kept apart from the grants, so they never
+// push an owner grant out.
+const WAITS_KEPT = 5;
+function waitsOf(req) {
+  const raw = signer.verify(parseCookies(req.headers.cookie).waits);
+  return raw ? raw.split('.').filter((t) => /^[a-z0-9]{16}$/.test(t)) : [];
+}
+const waitCookie = (req, token) => cookie('waits', signer.sign([...waitsOf(req).filter((t) => t !== token), token].slice(-WAITS_KEPT).join('.')), { maxAge: 7 * 864e2, secure: SECURE });
 
 function isAdmin(req) {
   if (!ADMIN_PASSWORD) return false;
@@ -223,8 +246,8 @@ const lineFor = (req, pageId, token) => flow.promptLine(`${baseUrl(req)}/u/${pag
 // `pageId` is the address in the line to paste.
 async function companyWait(req, company) {
   const own = await ownProfileId(req);
-  const { token, reservedId } = await store.createWait({ companyId: company.id, profileId: own });
-  return { token, pageId: own ?? reservedId };
+  const { token, reservedId } = await store.createWait({ companyId: company.id, profileId: own, browser: true });
+  return { token, pageId: own ?? reservedId, headers: own ? {} : { 'Set-Cookie': waitCookie(req, token) } };
 }
 
 // A person's page before its first answer.
@@ -288,8 +311,10 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
     // An answer waiting for review is not in the stored totals yet. On the
     // person's own page it shows already: counted into this page's numbers only,
     // unless an earlier answer of theirs is in the totals (it would count twice).
-    // A rejected or flagged answer is never counted, here either.
-    if (latest.status === 'pending' && !history.some((c) => c.status === 'accepted')) {
+    // A rejected or flagged answer is never counted, here either. Only its
+    // owner sees it counted in: anyone else with the link sees the shared numbers.
+    const countIn = acc?.owner && latest.status === 'pending' && !history.some((c) => c.status === 'accepted');
+    if (countIn) {
       const own = (kind) => delta(latest).map(([metric, key, value]) => ({ kind, month: monthKey(latest.created_at), metric, key, value }));
       t.all = numbersOf([...allCells, ...own('l'), ...own('m')]);
     }
@@ -308,6 +333,8 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
       harnesses: new Set(harnessNames(latest)),
       months: new Set(history.map((c) => c.created_at.slice(0, 7))),
       country: latest.country,
+      // Whether their latest answer is in the numbers this page shows.
+      counted: latest.status === 'accepted' || countIn,
     };
     if (acc?.owner) {
       t.again = `/u/${profile.id}/contribute`;
@@ -357,7 +384,11 @@ async function resolveWait(req, w) {
   if (!w.contribution_id) return { status: w.fetched_at ? 'fetched' : 'waiting' };
   const to = `/u/${w.profile_id}`;
   if (grantsOf(req).includes(`ou:${w.profile_id}`)) return { status: 'done', redirect: to };
-  if (await store.claimWait(w.token)) {
+  // Only an answer that made a new page hands out ownership (a run again
+  // already has its owner), and only to the browser that opened its line:
+  // the code in a pasted line must not let anyone else take the page.
+  const mayClaim = Boolean(w.reserved_id) && (!w.claim_needs_grant || waitsOf(req).includes(w.token));
+  if (mayClaim && await store.claimWait(w.token)) {
     // A new page gets its editor's code now, for the browser that owns it.
     const profile = await store.profile(w.profile_id);
     const issued = profile && !profile.editor_code_hash ? await issueCode('u', profile.id) : null;
@@ -463,7 +494,9 @@ async function handle(req, res) {
   if (companyMd) {
     const company = await store.company(companyMd[1]);
     if (!company) return send(res, 404, 'This company page does not exist (any more).', 'text/plain');
-    if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
+    // A company with a password hands out codes only behind it, in the browser.
+    if (company.password_hash) return send(res, 403, `This company page has a password. Open ${baseUrl(req)}/c/${company.id}/contribute in a browser, enter the password, and paste the line it shows.`, 'text/plain');
+    { const retry = limited(req, 'prompt', 30); if (retry) return tooManyRequests(res, retry); }
     // Every fetch gets its own one-time code: one colleague, one answer.
     const { token } = await store.createWait({ companyId: company.id });
     return md(surveyText(req, await store.liveWait(token)));
@@ -476,11 +509,14 @@ async function handle(req, res) {
   if (toolsAt) return toolsRoute(res, await tourData(req, {}), toolsAt[1]);
   if (p === '/contribute') {
     if (url.searchParams.get('for') === 'company') return privateHtml(res, flow.companyStartPage({ error: url.searchParams.get('error') }));
-    if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
-    const { token, reservedId } = await store.createWait();
+    // A browser that already has a page runs it again there, rather than starting a second one.
+    const own = await ownProfileId(req);
+    if (own) return redirect(res, `/u/${own}/contribute`);
+    { const retry = limited(req, 'prompt', 30); if (retry) return tooManyRequests(res, retry); }
+    const { token, reservedId } = await store.createWait({ browser: true });
     // An invitation link names its sender, and nothing else about them.
     const inviter = await store.profileByInvite(url.searchParams.get('from'));
-    return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, reservedId, token), inviter: inviter ? { name: inviter.name } : null }));
+    return privateHtml(res, flow.joinMePage({ token, line: lineFor(req, reservedId, token), inviter: inviter ? { name: inviter.name } : null }), { 'Set-Cookie': waitCookie(req, token) });
   }
 
   // A person's page.
@@ -489,7 +525,7 @@ async function handle(req, res) {
     const profile = await store.profile(prof[1]);
     if (!profile) return html(res, views.notFoundPage(), 404);
     const acc = access(req, 'u', profile);
-    if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'u', id: profile.id, error: url.searchParams.get('error') }));
+    if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'u', id: profile.id, error: url.searchParams.get('error'), next: p }));
     if (prof[2] === '/edit') return editPage(req, res, url, 'u', profile, acc);
     if (prof[2] === '/contribute') {
       if (!acc.owner) return redirect(res, `/u/${profile.id}`);
@@ -514,16 +550,16 @@ async function handle(req, res) {
     const company = await store.company(comp[1]);
     if (!company) return html(res, views.notFoundPage(), 404);
     const acc = access(req, 'c', company);
-    if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'c', id: company.id, error: url.searchParams.get('error') }));
+    if (!acc.viewer) return privateHtml(res, views.unlockPage({ kind: 'c', id: company.id, error: url.searchParams.get('error'), next: p }));
     if (comp[2] === '/edit') return editPage(req, res, url, 'c', company, acc);
     if (comp[2] === '/contribute' || comp[2] === '/invite') {
       if (comp[2] === '/invite' && !acc.owner) return redirect(res, `/c/${company.id}/contribute`);
-      if (limited(req, 'prompt', 30)) return send(res, 429, 'Too many requests', 'text/plain');
+      { const retry = limited(req, 'prompt', 30); if (retry) return tooManyRequests(res, retry); }
       if (comp[2] === '/invite' && await companyOpen(company)) return privateHtml(res, flow.companyOpenPage({ company, own: await ownProfileId(req) }));
       const wait = await companyWait(req, company);
       const props = { company, token: wait.token, line: lineFor(req, wait.pageId, wait.token) };
-      if (comp[2] === '/invite') return privateHtml(res, flow.companyInvitePage({ ...props, base: baseUrl(req), code: shownCode(req, 'c', company.id) }));
-      return privateHtml(res, flow.joinMePage(props));
+      if (comp[2] === '/invite') return privateHtml(res, flow.companyInvitePage({ ...props, base: baseUrl(req), code: shownCode(req, 'c', company.id) }), wait.headers);
+      return privateHtml(res, flow.joinMePage(props), wait.headers);
     }
     // Before 5 people have answered, the page shows how many have; then the tour through its lens.
     if (!(await companyOpen(company))) {
@@ -584,7 +620,7 @@ async function handle(req, res) {
 
 async function post(req, res, url, p, m) {
   if (!sameOrigin(req)) return send(res, 403, 'Forbidden', 'text/plain');
-  if (limited(req, 'form', 30)) return send(res, 429, 'Too many requests', 'text/plain');
+  { const retry = limited(req, 'form', 30); if (retry) return tooManyRequests(res, retry); }
 
   if (p === '/companies') {
     if (limited(req, 'company', 10, 3600_000)) return send(res, 429, 'Too many company pages from this address. Try again later.', 'text/plain');
@@ -599,25 +635,36 @@ async function post(req, res, url, p, m) {
   const unlock = m(/^\/(u|c)\/([a-z0-9]{8,10})\/unlock$/);
   if (unlock) {
     const [, kind, id] = unlock;
-    if (limited(req, `unlock:${kind}:${id}`, 8, 15 * 60_000)) return send(res, 429, 'Too many attempts. Try again in 15 minutes.', 'text/plain');
+    const bucket = `unlock:${kind}:${id}`;
+    const wait = guessesLeft(req, bucket, 8, 15 * 60_000);
+    if (wait) return tooMany(res, wait);
     const row = kind === 'u' ? await store.profile(id) : await store.company(id);
     if (!row) return html(res, views.notFoundPage(), 404);
     const form = await readForm(req);
-    if (!row.password_hash) return redirect(res, `/${kind}/${id}`);
-    if (!verifyPassword(String(form.password || ''), row.password_hash)) return redirect(res, `/${kind}/${id}?error=wrong`);
+    const next = backTo(form.next, kind, id, `/${kind}/${id}`);
+    if (!row.password_hash) return redirect(res, next);
+    if (!verifyPassword(String(form.password || ''), row.password_hash)) {
+      wrongGuess(req, bucket, 15 * 60_000);
+      return redirect(res, `${next}?error=wrong`);
+    }
     // The password only opens the page. Editing it takes the editor's code.
-    return redirect(res, `/${kind}/${id}`, { 'Set-Cookie': grantCookie(req, [`v${kind}:${id}:${fingerprint(row.password_hash)}`]) });
+    return redirect(res, next, { 'Set-Cookie': grantCookie(req, [`v${kind}:${id}:${fingerprint(row.password_hash)}`]) });
   }
 
   // The editor's code makes this browser an owner of the page.
   const editUnlock = m(/^\/(u|c)\/([a-z0-9]{8,10})\/edit\/unlock$/);
   if (editUnlock) {
     const [, kind, id] = editUnlock;
-    if (limited(req, `edit:${kind}:${id}`, 8, 15 * 60_000)) return send(res, 429, 'Too many attempts. Try again in 15 minutes.', 'text/plain');
+    const bucket = `edit:${kind}:${id}`;
+    const wait = guessesLeft(req, bucket, 8, 15 * 60_000);
+    if (wait) return tooMany(res, wait);
     const row = kind === 'u' ? await store.profile(id) : await store.company(id);
     if (!row) return html(res, views.notFoundPage(), 404);
     const form = await readForm(req);
-    if (!verifyEditorCode(form.code, row.editor_code_hash)) return redirect(res, `/${kind}/${id}/edit?error=wrong`);
+    if (!verifyEditorCode(form.code, row.editor_code_hash)) {
+      wrongGuess(req, bucket, 15 * 60_000);
+      return redirect(res, `/${kind}/${id}/edit?error=wrong`);
+    }
     return redirect(res, `/${kind}/${id}/edit`, { 'Set-Cookie': grantCookie(req, [`o${kind}:${id}`]) });
   }
 
@@ -654,9 +701,13 @@ async function post(req, res, url, p, m) {
   // ---------- admin ----------
   if (p === '/admin/login') {
     if (!ADMIN_PASSWORD) return send(res, 404, 'Not found', 'text/plain');
-    if (limited(req, 'admin-login', 5, 15 * 60_000)) return send(res, 429, 'Too many attempts. Try again in 15 minutes.', 'text/plain');
+    const wait = guessesLeft(req, 'admin-login', 5, 15 * 60_000);
+    if (wait) return tooMany(res, wait);
     const form = await readForm(req);
-    if (!safeEqual(String(form.password || ''), ADMIN_PASSWORD)) return redirect(res, '/admin/login?error=1');
+    if (!safeEqual(String(form.password || ''), ADMIN_PASSWORD)) {
+      wrongGuess(req, 'admin-login', 15 * 60_000);
+      return redirect(res, '/admin/login?error=1');
+    }
     const value = signer.sign(`admin:${Date.now() + 12 * 3600_000}:${fingerprint(hashOfAdmin)}`);
     return redirect(res, '/admin', { 'Set-Cookie': cookie('admin', value, { maxAge: 12 * 3600, secure: SECURE }) });
   }
