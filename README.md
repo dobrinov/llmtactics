@@ -75,7 +75,7 @@ come from answers arriving month after month, not from anyone's old history.
 Within the 30 days the assistant counts instead of sampling. The prompt
 carries a script, `survey/measure.py` (put in place of `{{MEASURE}}`), that
 Claude Code saves in the temporary folder, the one file the survey writes,
-and deletes at the end. It has three uses:
+and deletes at the end. It has four uses:
 
 - `measure` reads every transcript, including the subagents' (which a
   `projects/*/*.jsonl` glob misses), counts each model reply once (a reply
@@ -90,6 +90,16 @@ and deletes at the end. It has three uses:
   frequency, whether it is new, and its cost: what the typical prompt of
   that habit costs to answer, next to the person's typical prompt. The
   assistant reports those as printed.
+- `tools` checks a fixed list of coding agents, editors, terminals,
+  multiplexers and chat apps: whether each is installed, running now, and on
+  how many of the 30 days it was used, from the first word of each shell
+  history line, the dates of the tools' own session files, and the terminal
+  the assistant runs in. From that it prints the frequency to report
+  (`daily`, `weekly`, `occasionally`), and the model named in each coding
+  agent's settings. It prints names from its list, numbers and model ids,
+  nothing else. Each tool in an answer then carries `frequency` and `open`,
+  and the tool pages show the share of a tool's users who use it daily (from
+  5 answers that say how often).
 
 Sessions that ran the survey itself are left out of `read` and `count`.
 

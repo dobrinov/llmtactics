@@ -285,6 +285,8 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
       setupSize: devTools(latest).size,
       setupTools: [...devTools(latest).values()],
       tools: new Set(latest.tools.map((x) => x.name.toLowerCase())),
+      // How often they said they use each tool (daily, weekly, occasionally), where they said.
+      toolFrequency: new Map(latest.tools.filter((x) => x.frequency).map((x) => [x.name.toLowerCase(), x.frequency])),
       families: new Set(familyNames(latest)),
       versions: new Set(versionNames(latest)),
       harnesses: new Set(harnessNames(latest)),

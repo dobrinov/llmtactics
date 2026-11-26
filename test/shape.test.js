@@ -109,3 +109,15 @@ test('room for every known pattern and a few of the person\'s own', () => {
   const patterns = Array.from({ length: 40 }, (_, i) => ({ title: `Habit ${i}`, summary: 's' }));
   assert.equal(cleanContribution({ ...minimal, patterns }).patterns.length, 32);
 });
+
+test('keeps how often a tool is used and whether it is open, and nothing else', () => {
+  const c = cleanContribution({
+    ...minimal,
+    tools: [
+      { name: 'tmux', kind: 'multiplexer', frequency: 'daily', open: true },
+      { name: 'Cursor', kind: 'editor', frequency: 'hourly', open: 'yes' },
+      { name: 'Zed', kind: 'editor' },
+    ],
+  });
+  assert.deepEqual(c.tools.map((t) => [t.frequency, t.open]), [['daily', true], [null, false], [null, false]]);
+});

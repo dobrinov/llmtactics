@@ -89,6 +89,10 @@ CREATE TABLE IF NOT EXISTS contribution_tools (
   used_for text
 );
 CREATE INDEX IF NOT EXISTS tools_contribution ON contribution_tools(contribution_id);
+-- How often the person used the tool in the 30 days (daily, weekly,
+-- occasionally), and whether it was running when they answered.
+ALTER TABLE contribution_tools ADD COLUMN IF NOT EXISTS frequency text;
+ALTER TABLE contribution_tools ADD COLUMN IF NOT EXISTS open boolean NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS contribution_purposes (
   contribution_id bigint NOT NULL REFERENCES contributions(id) ON DELETE CASCADE,

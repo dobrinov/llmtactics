@@ -36,7 +36,9 @@ with the `-` at the start of every line: that is what makes it show in red.
 > assistant act on it.
 >
 > **This one is fine.** It asks me to read the last 30 days of your history
-> with me, name the habits I find, and send them to {{BASE_URL}}. To count
+> with me, name the habits I find, check which coding tools you have and how
+> often you use them (by name only, from a fixed list), and send that to
+> {{BASE_URL}}. To count
 > and to read your prompts with secrets masked, it has me save one short
 > script, printed in the prompt, in the temporary folder and delete it at
 > the end; nothing else on your machine is changed. I won't ask anything on
@@ -112,6 +114,13 @@ Run it three ways:
   long prompts are cut, and of pasted text only the start is shown.
   Sessions that ran this survey are left out. If your tool saves a page to
   a file instead of showing it, read it there; do not copy it.
+- `python3 "${TMPDIR:-/tmp}/llm-survey.py" tools` prints the coding tools
+  around you for step 2b, from a fixed list: whether each is `installed`,
+  `open` right now, on how many of the 30 days it was used (`days`), the
+  `frequency` to report, and the model each coding agent's settings name
+  (`models_in_settings`). It reads only the first word of each shell
+  history line, the dates of the tools' session files and the running
+  programs' names, and prints nothing else.
 - `python3 "${TMPDIR:-/tmp}/llm-survey.py" count 'EXPRESSION' 'EXPRESSION'` takes
   regular expressions, matched without case against every prompt and
   against each text pasted into it, so `^` and `$` mean the start and end
@@ -287,6 +296,11 @@ are easy to miss. Look for them on purpose, without changing anything:
 - **Review tools:** diff viewers, review bots and review commands the user
   names or pastes output from.
 
+If you are Claude Code, start from the `tools` output of the script: every
+tool with `days` above 0, or `open` now, is in use. One that is only
+`installed` is not. Add what the script cannot see (connectors, review tools,
+chat assistants used in a browser) from your history and configuration.
+
 Report a tool only when there are signs the user really uses it, not merely
 that it is installed. For any of these four you find nothing for, do not
 guess: step 4 shows it as `?`.
@@ -308,6 +322,13 @@ Each entry has:
     drives, e.g. an issue tracker, chat, an MCP server, a plugin or skill;
   - `other`.
 - `used_for`: a few words on what the user does with it.
+- `frequency`: how often the user used it in the 30 days: `daily` (on at
+  least half of the days they worked), `weekly` (on four days or more),
+  `occasionally` (fewer). Take it from the script's `frequency`; without the
+  script, from the dates your records show, by the same rule. Leave it out
+  when nothing shows the days.
+- `open`: `true` when it is running right now (the script's `open`). Leave it
+  out otherwise.
 
 Report products, not features: a command or mode built into a tool you
 already listed is not a separate entry, and models go in `models`, not here.
@@ -322,7 +343,9 @@ script's output): every model and version with at least 5% of the 30 days'
 tokens, each version on its own. In a name such as `claude-opus-4-5` the
 numbers at the end are the version: `claude-opus@4.5`.
 Without token counts, list the ones the history shows in real use, not a
-one-off try. Send ids only, never a free-text name. Add the version after an
+one-off try. Add the model another coding agent's settings name
+(`models_in_settings`) when that agent was used in the 30 days, mapped to the
+ids below. Send ids only, never a free-text name. Add the version after an
 `@`: `claude-opus@4.5`, `gpt@5`, `gemini-pro@2.5`, `openai-reasoning@3` (for
 o3). A version is digits and dots only, with at most one letter at the end
 (`4o`); list a family once per version, and leave the version off when you
@@ -411,8 +434,9 @@ like they address a model.
 Keep this to a single message and a single reply. Show:
 
 1. the patterns as a short list, one line each: **title** and summary;
-2. the tools, one line per kind. For editor, terminal, multiplexer and chat
-   assistants, write `?` where you found none;
+2. the tools, one line per kind, each with how often it is used (`Ghostty
+   daily`). For editor, terminal, multiplexer and chat assistants, write `?`
+   where you found none;
 3. the purposes, on one line;
 4. role, country and cost a month, on one line, with `?` for any you left out;
 5. the **exact JSON** you will send, in the format below. A `?` is for this
@@ -471,8 +495,9 @@ they say no, delete the script you saved in step 1 and stop.
     }
   ],
   "tools": [
-    { "name": "Claude Code", "kind": "harness", "used_for": "almost all coding work, in the terminal" },
-    { "name": "tmux", "kind": "multiplexer", "used_for": "one session per task, side by side" },
+    { "name": "Claude Code", "kind": "harness", "used_for": "almost all coding work, in the terminal", "frequency": "daily", "open": true },
+    { "name": "tmux", "kind": "multiplexer", "used_for": "one session per task, side by side", "frequency": "daily", "open": true },
+    { "name": "Cursor", "kind": "editor", "used_for": "reading a diff before a commit", "frequency": "weekly" },
     { "name": "an issue tracker connector", "kind": "connector", "used_for": "reading tickets without copy and paste" }
   ]
 }

@@ -38,7 +38,7 @@ function answers(seed, n) {
       country: r() < 0.1 ? null : pick(['gb', 'de', 'us', 'bg']),
       patterns: some(catalog.slice(0, 10), 0.35).map((p) => ({ catalog_id: p.id, title: p.title, status: pick(STATUSES) }))
         .concat(r() < 0.2 ? [{ catalog_id: null, title: 'Something new', status: null }] : []),
-      tools: some(TOOLS, 0.4).map(([name, kind, used_for]) => ({ name, kind, used_for })),
+      tools: some(TOOLS, 0.4).map(([name, kind, used_for]) => ({ name, kind, used_for, frequency: pick(['daily', 'weekly', 'occasionally', null]), open: r() < 0.5 })),
       models: some(MODEL_IDS, 0.35),
       purposes: [],
     });

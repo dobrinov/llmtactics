@@ -108,6 +108,148 @@ log = [e for e in log if e[1] not in surveyed]
 log_days = sorted({day_of(e[0]) for e in log})
 mode = sys.argv[1] if len(sys.argv) > 1 else "measure"
 
+if mode == "tools":
+    # The tools around the assistant, from a fixed list: which are installed, which run now, and on
+    # how many of the 30 days each was used. Evidence: the command word of each shell history line
+    # (nothing else of the line is kept), the dates of the tools' own session files, and the
+    # terminal this runs in. It prints names from this list, numbers and model ids, nothing else.
+    import shutil, subprocess
+    home = os.path.expanduser("~")
+    MAC = ["/Applications", os.path.join(home, "Applications")]
+    # name, kind, app bundles, commands (installed, typed), processes, folders whose files are sessions
+    KNOWN = [
+        ("Claude Code", "harness", [], ["claude"], ["claude"], []),
+        ("Codex CLI", "harness", [], ["codex"], ["codex"], ["~/.codex/sessions/**/*.jsonl"]),
+        ("Gemini CLI", "harness", [], ["gemini"], ["gemini"], ["~/.gemini/tmp/*/chats/*.json", "~/.gemini/tmp/*/logs.json"]),
+        ("OpenCode", "harness", [], ["opencode"], ["opencode"], ["~/.local/share/opencode/storage/session/**/*.json"]),
+        ("Aider", "harness", [], ["aider"], ["aider"], []),
+        ("Amp", "harness", [], ["amp"], ["amp"], []),
+        ("Cursor", "editor", ["Cursor.app"], ["cursor"], ["Cursor"], ["~/Library/Application Support/Cursor/User/workspaceStorage/*", "~/.config/Cursor/User/workspaceStorage/*"]),
+        ("VS Code", "editor", ["Visual Studio Code.app"], ["code"], ["Code", "code"], ["~/Library/Application Support/Code/User/workspaceStorage/*", "~/.config/Code/User/workspaceStorage/*"]),
+        ("Windsurf", "editor", ["Windsurf.app"], ["windsurf"], ["Windsurf"], ["~/Library/Application Support/Windsurf/User/workspaceStorage/*", "~/.config/Windsurf/User/workspaceStorage/*"]),
+        ("Zed", "editor", ["Zed.app"], ["zed"], ["zed"], []),
+        ("Neovim", "editor", [], ["nvim"], ["nvim"], []),
+        ("Vim", "editor", [], ["vim"], ["vim"], []),
+        ("Emacs", "editor", ["Emacs.app"], ["emacs"], ["emacs", "Emacs"], []),
+        ("Ghostty", "terminal", ["Ghostty.app"], ["ghostty"], ["ghostty"], []),
+        ("iTerm2", "terminal", ["iTerm.app"], [], ["iTerm2"], []),
+        ("Warp", "terminal", ["Warp.app"], [], ["stable", "Warp"], []),
+        ("WezTerm", "terminal", ["WezTerm.app"], ["wezterm"], ["wezterm-gui"], []),
+        ("kitty", "terminal", ["kitty.app"], ["kitty"], ["kitty"], []),
+        ("Alacritty", "terminal", ["Alacritty.app"], ["alacritty"], ["alacritty"], []),
+        ("Terminal.app", "terminal", [], [], ["Terminal"], []),
+        ("tmux", "multiplexer", [], ["tmux"], ["tmux"], []),
+        ("Zellij", "multiplexer", [], ["zellij"], ["zellij"], []),
+        ("ChatGPT", "chat", ["ChatGPT.app"], [], ["ChatGPT"], []),
+        ("Claude", "chat", ["Claude.app"], [], ["Claude"], []),
+    ]
+    # What TERM_PROGRAM and friends call each terminal: it runs on every day the assistant is used.
+    TERMS = {"ghostty": "Ghostty", "iTerm.app": "iTerm2", "WarpTerminal": "Warp", "WezTerm": "WezTerm", "Apple_Terminal": "Terminal.app", "vscode": "VS Code", "zed": "Zed"}
+    window = lambda t: t >= since
+    days_of = defaultdict(set)
+    # Shell history with times: zsh (": <time>:0;cmd"), bash with HISTTIMEFORMAT ("#<time>" lines), fish.
+    words = {c: n for n, _, _, cmds, _, _ in KNOWN for c in cmds}
+    def typed_word(cmd, t):
+        m = re.match(r"\s*(?:sudo\s+|command\s+|exec\s+|\w+=\S*\s+)*([\w.-]+)", cmd)
+        if m and m.group(1) in words and window(t):
+            days_of[words[m.group(1)]].add(day_of(t))
+    for hist in [os.environ.get("HISTFILE") or "", os.path.join(home, ".zsh_history"), os.path.join(home, ".bash_history")]:
+        try:
+            stamp = None
+            for line in open(hist, errors="ignore"):
+                z = re.match(r": (\d{9,11}):\d+;(.*)", line)
+                if z:
+                    typed_word(z.group(2), datetime.fromtimestamp(int(z.group(1)), timezone.utc))
+                elif re.match(r"#\d{9,11}\s*$", line):
+                    stamp = datetime.fromtimestamp(int(line[1:]), timezone.utc)
+                elif stamp:
+                    typed_word(line, stamp)
+                    stamp = None
+        except (OSError, ValueError):
+            pass
+    try:
+        cmd = None
+        for line in open(os.path.join(home, ".local/share/fish/fish_history"), errors="ignore"):
+            if line.startswith("- cmd: "):
+                cmd = line[7:]
+            elif line.strip().startswith("when: ") and cmd:
+                typed_word(cmd, datetime.fromtimestamp(int(line.split(":")[1]), timezone.utc))
+                cmd = None
+    except (OSError, ValueError):
+        pass
+    # Session files: the day each was last written.
+    for n, _, _, _, _, globs in KNOWN:
+        for g in globs:
+            for f in glob.glob(os.path.expanduser(g), recursive=True):
+                try:
+                    t = datetime.fromtimestamp(os.path.getmtime(f), timezone.utc)
+                except OSError:
+                    continue
+                if window(t):
+                    days_of[n].add(day_of(t))
+    # This assistant's own days, and the terminal and multiplexer it runs in share them.
+    days_of["Claude Code"] |= set(log_days)
+    here = []
+    if os.environ.get("TMUX"):
+        here.append("tmux")
+    if os.environ.get("ZELLIJ"):
+        here.append("Zellij")
+    terminal = TERMS.get(os.environ.get("TERM_PROGRAM", ""))
+    if os.environ.get("TMUX"):
+        try:
+            out = subprocess.run(["tmux", "show-environment", "-g", "TERM_PROGRAM"], capture_output=True, text=True, timeout=5).stdout
+            terminal = TERMS.get(out.strip().partition("=")[2]) or terminal
+        except (OSError, subprocess.SubprocessError):
+            pass
+    for prefix, n in (("GHOSTTY_", "Ghostty"), ("ITERM_", "iTerm2"), ("KITTY_", "kitty"), ("WEZTERM_", "WezTerm"), ("ALACRITTY_", "Alacritty"), ("WARP_", "Warp")):
+        if any(k.startswith(prefix) for k in os.environ):
+            terminal = terminal or n
+    if terminal:
+        here.append(terminal)
+    for n in here:
+        days_of[n] |= set(log_days)
+    # Running now: process names only.
+    try:
+        running = {os.path.basename(p.strip()) for p in subprocess.run(["ps", "-axo", "comm="], capture_output=True, text=True, timeout=10).stdout.splitlines()}
+    except (OSError, subprocess.SubprocessError):
+        running = set()
+    active = set(log_days).union(*days_of.values()) if days_of else set(log_days)
+    rows = []
+    for n, kind, apps, cmds, procs, _ in KNOWN:
+        installed = any(os.path.exists(os.path.join(d, a)) for d in MAC for a in apps) or any(shutil.which(c) for c in cmds)
+        is_open = n in here or any(p in running for p in procs)
+        d = len(days_of[n])
+        if not (installed or is_open or d):
+            continue
+        rows.append({"name": n, "kind": kind, "installed": bool(installed), "open": is_open, "days": d,
+                     "frequency": None if not d else "daily" if d * 2 >= len(active) else "weekly" if d >= 4 else "occasionally"})
+    # The model each agent is set to use, from its settings file.
+    MODEL = re.compile(r"^[A-Za-z0-9._:/@-]{1,60}$")
+    def setting(path, read):
+        try:
+            text = open(os.path.expanduser(path), errors="ignore").read()
+            value = read(text)
+            return value if isinstance(value, str) and MODEL.match(value) else None
+        except (OSError, ValueError, AttributeError, TypeError, KeyError):
+            return None
+    def toml_model(text):
+        m = re.search(r'(?m)^model\s*=\s*"([^"]+)"', text)
+        return m and m.group(1)
+    def json_model(text):
+        o = json.loads(re.sub(r"(?m)^\s*//.*$", "", text))
+        m = o.get("model")
+        return m.get("name") if isinstance(m, dict) else m
+    settings = {
+        "Claude Code": setting(os.path.join(root, "settings.json"), json_model),
+        "Codex CLI": setting("~/.codex/config.toml", toml_model),
+        "Gemini CLI": setting("~/.gemini/settings.json", json_model),
+        "OpenCode": setting("~/.config/opencode/opencode.json", json_model) or setting("~/.config/opencode/opencode.jsonc", json_model),
+        "Aider": setting("~/.aider.conf.yml", lambda t: re.search(r"(?m)^model:\s*(\S+)", t).group(1)),
+    }
+    print(json.dumps({"active_days": len(active), "tools": sorted(rows, key=lambda r: (-r["days"], not r["open"], r["name"])),
+                      "models_in_settings": {k: v for k, v in settings.items() if v}}, indent=1))
+    sys.exit()
+
 if mode == "read":
     PAGE = 16000  # bytes: small enough for a tool to show whole
     order = {}

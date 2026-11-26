@@ -79,7 +79,12 @@ for (let i = 0; i < count; i++) {
   }
   if (!patterns.length) patterns.push({ title: 'Paste The Evidence', catalog_id: 'paste-the-evidence', summary: 'Pastes raw errors.' });
   const assistant = pickOne(assistants, [6, 2, 1.5, 1, 0.8, 0.5]);
-  const tools = toolPool.filter(([name, , , s]) => name === assistant || chance(s)).map(([name, kind, used_for]) => ({ name, kind, used_for }));
+  const tools = toolPool.filter(([name, , , s]) => name === assistant || chance(s)).map(([name, kind, used_for]) => ({
+    name, kind, used_for,
+    // Agents, terminals and multiplexers are mostly daily; the rest less often. Older answers did not say.
+    frequency: daysAgo > 120 ? null : pickOne(['daily', 'weekly', 'occasionally'], ['harness', 'terminal', 'multiplexer'].includes(kind) || name === assistant ? [6, 2, 1] : [2, 3, 3]),
+    open: chance(0.4),
+  }));
   const role = pickOne(ROLES.map((r) => r.id), [31, 14, 22, 3, 9, 4, 8, 7, 6, 3]);
   const heavy = role === 'product' || role === 'manager' || role === 'design' ? 0 : 1;
   // What the tokens are: only the assistants that keep token records measure it.
