@@ -6,7 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openDb } from './lib/db.js';
 import { cleanContribution, catalog, PURPOSES, PROMPT_RANGES, MONTH_RANGES, ROLES, TASK_MINUTE_RANGES, TASK_PROMPT_RANGES, TOKEN_RANGES, LINES_RANGES, COST_RANGES, CONTEXT_RANGES, MODELS } from './lib/shape.js';
-import { counted, MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, devTools } from './lib/stats.js';
+import { counted, MIN_GROUP, NO_COUNTRY, familyNames, versionNames, harnessNames, setupKey, setupTools } from './lib/stats.js';
 import { tourPage, toolsIndexPage, toolPage, toolSlug, whoFor } from './lib/tour.js';
 import * as flow from './lib/flow.js';
 import { numbersOf, toolDetailOf, delta } from './lib/aggregate.js';
@@ -292,8 +292,8 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
     t.me = {
       patterns: new Set(latest.patterns.map((p) => p.catalog_id).filter(Boolean)),
       setupKey: setupKey(latest),
-      setupSize: devTools(latest).size,
-      setupTools: [...devTools(latest).values()],
+      setupSize: setupTools(latest).size,
+      setupTools: [...setupTools(latest).values()],
       tools: new Set(latest.tools.map((x) => x.name.toLowerCase())),
       // How often they said they use each tool (daily, weekly, occasionally), where they said.
       toolFrequency: new Map(latest.tools.filter((x) => x.frequency).map((x) => [x.name.toLowerCase(), x.frequency])),

@@ -59,7 +59,7 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .note-line .tip { top: calc(100% + 8px); left: 50%; transform: translateX(-50%); }
 
 /* ---------- 02 habits: the radar ---------- */
-.tradar { position: relative; width: min(560px, calc(100svh - 200px), 100%); aspect-ratio: 1; flex: none; margin: auto 0; }
+.tradar { position: relative; width: min(560px, calc(100svh - 200px), 100%); aspect-ratio: 1; flex: none; margin: auto 0; container-type: inline-size; }
 .tradar-disc { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 1px #e2e8f0; }
 .tradar-disc .qt { position: absolute; width: 50%; height: 50%; opacity: 0.55; }
 .tradar-disc .qt.q0 { left: 0; top: 0; background: var(--t0); } .tradar-disc .qt.q1 { right: 0; top: 0; background: var(--t1); }
@@ -71,8 +71,10 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .quad.q0 { left: -8px; top: -8px; color: var(--q0); } .quad.q1 { right: -8px; top: -8px; color: var(--q1); }
 .quad.q2 { left: -8px; bottom: -8px; color: var(--q2); } .quad.q3 { right: -8px; bottom: -8px; color: var(--q3); }
 .quad[aria-pressed="true"] { border-color: currentColor; background: #fff; }
-.hdot { position: absolute; z-index: 3; width: var(--s); height: var(--s); margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2); padding: 0; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); transition: transform 0.12s; }
+/* Sizes are set for a 560px radar and scale with it, so the placement (lib/radar.js) keeps dots apart at any width. */
+.hdot { --d: calc(var(--s) * 100cqw / 560px); position: absolute; z-index: 3; width: var(--d); height: var(--d); margin: calc(var(--d) / -2) 0 0 calc(var(--d) / -2); padding: 0; border-radius: 50%; border: 2px solid #fff; cursor: pointer; box-shadow: 0 1px 3px rgba(15, 23, 42, 0.25); transition: transform 0.12s; }
 .hdot:hover, .hdot:focus-visible { transform: scale(1.2); z-index: 6; }
+.hdot.on { transform: scale(1.25); z-index: 7; outline: 3px solid var(--ink); outline-offset: 2px; }
 .hdot.q0 { background: var(--q0); } .hdot.q1 { background: var(--q1); } .hdot.q2 { background: var(--q2); } .hdot.q3 { background: var(--q3); }
 .hdot.hollow { background: #fff; border-color: currentColor; } .hdot.hollow.q0 { color: var(--q0); } .hdot.hollow.q1 { color: var(--q1); } .hdot.hollow.q2 { color: var(--q2); } .hdot.hollow.q3 { color: var(--q3); }
 .hdot.dim { background: #94a3b8; box-shadow: none; }
@@ -92,6 +94,9 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tcard p { font-size: 14px; line-height: 1.5; }
 .tcard-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
 .tcard-share { font-weight: 600; color: var(--ink); }
+.tcard-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px solid #e2e8f0; }
+.tcard-step { width: 36px; height: 36px; border: 0; border-radius: 50%; background: #f1f5f9; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.tcard-step:hover { background: #e2e8f0; }
 .x { width: 32px; height: 32px; flex: none; border: 0; border-radius: 50%; background: #f1f5f9; color: var(--ink); cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .badge { padding: 3px 10px; border-radius: 999px; font: 600 12px var(--sans); }
 .badge.q0 { background: var(--t0); color: var(--q0); } .badge.q1 { background: var(--t1); color: var(--q1); } .badge.q2 { background: var(--t2); color: var(--q2); } .badge.q3 { background: var(--t3); color: var(--q3); }

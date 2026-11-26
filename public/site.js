@@ -150,8 +150,16 @@ if (deck) {
   });
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey || e.altKey) return;
-    // An open details card keeps the keyboard: Esc closes it first.
-    try { if (document.querySelector('.tcard:popover-open')) return; } catch { /* no :popover-open support */ }
+    // An open details card keeps the keyboard: Esc closes it, and the arrow keys
+    // step to the previous or next habit when the card has those buttons.
+    let card = null;
+    try { card = document.querySelector('.tcard:popover-open'); } catch { /* no :popover-open support */ }
+    if (card) {
+      const dir = { ArrowRight: 1, PageDown: 1, ArrowLeft: -1, PageUp: -1 }[e.key];
+      const to = dir && card.querySelector(`[data-card-step="${dir}"]`);
+      if (to) { e.preventDefault(); to.click(); }
+      return;
+    }
     if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); goTo(current + 1); }
     if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); goTo(current - 1); }
   });
@@ -268,4 +276,35 @@ for (const input of document.querySelectorAll('[data-tool-filter]')) {
     }
     list.querySelector('[data-no-match]').hidden = any;
   });
+}
+
+// Habit cards on the radar: Previous and Next swap one card for the other (a
+// button inside an open popover would open the next one on top of it), and the
+// dot of the open card stays marked.
+document.addEventListener('click', (e) => {
+  const step = e.target.closest('[data-card-to]');
+  const from = step?.closest('.tcard');
+  const to = step && document.getElementById(step.dataset.cardTo);
+  if (!from || !to) return;
+  from.hidePopover();
+  to.showPopover();
+  to.querySelector(`[data-card-step="${step.dataset.cardStep}"]`)?.focus();
+});
+for (const card of document.querySelectorAll('.tcard[id^="h-"]')) {
+  card.addEventListener('toggle', (e) => {
+    for (const dot of document.querySelectorAll(`.hdot[popovertarget="${card.id}"]`)) dot.classList.toggle('on', e.newState === 'open');
+  });
+}
+
+// The radar slide opens with its first habit selected (on a person's page, their
+// first one), and closes the card when the slide is left.
+const habits = document.getElementById('habits');
+if (habits && document.querySelector('[data-deck]')) {
+  const cards = [...habits.querySelectorAll('.tcard[id^="h-"]')];
+  const first = cards.find((c) => habits.querySelector(`.hdot.mine[popovertarget="${c.id}"]`)) ?? cards[0];
+  const isOpen = (c) => { try { return c.matches(':popover-open'); } catch { return false; } };
+  new IntersectionObserver(([entry]) => {
+    if (entry.isIntersecting) { if (first && !cards.some(isOpen)) first.showPopover(); }
+    else for (const c of cards) if (isOpen(c)) c.hidePopover();
+  }, { threshold: 0.6 }).observe(habits);
 }

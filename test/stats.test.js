@@ -4,7 +4,7 @@ import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { openDb } from '../lib/db.js';
 import { cleanContribution, PROMPT_RANGES } from '../lib/shape.js';
-import { tailRange, medianRange, radar, tools, experience, counted, percentile, compare, exactSetups, stackedShares, familyNames, toolDetail } from '../lib/stats.js';
+import { tailRange, medianRange, radar, tools, experience, counted, percentile, compare, exactSetups, stackedShares, familyNames, toolDetail, setupKey } from '../lib/stats.js';
 
 const sub = (ids, extra = {}) => cleanContribution({
   assistant: 'Claude Code',
@@ -233,4 +233,12 @@ test('stored totals follow every change to an answer, and match a fresh count', 
   assert.equal((await store.checkTotals()).differ.length, 1, 'a check notices totals that drifted');
   await store.rebuildTotals();
   await ok('a rebuild');
+});
+
+test('a setup is the working environment, without connectors or chat assistants', () => {
+  const c = sub(['clean-slate'], { tools: [
+    { name: 'Claude Code', kind: 'harness' }, { name: 'tmux', kind: 'multiplexer' }, { name: 'Ghostty', kind: 'terminal' },
+    { name: 'Slack', kind: 'connector' }, { name: 'Meshy MCP', kind: 'connector' }, { name: 'ChatGPT', kind: 'chat' },
+  ] });
+  assert.deepEqual(setupKey(c).split('\n'), ['claude code', 'ghostty', 'tmux']);
 });
