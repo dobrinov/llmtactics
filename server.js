@@ -14,6 +14,7 @@ import { monthKey } from './lib/stats.js';
 import { hashPassword, verifyPassword, createSigner, parseCookies, cookie, injectionSigns, freeText, safeEqual, newEditorCode, hashEditorCode, verifyEditorCode } from './lib/security.js';
 import * as views from './lib/views.js';
 import * as admin from './lib/admin-views.js';
+import { companyName } from './lib/html.js';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT || 4400);
@@ -246,7 +247,6 @@ async function editPage(req, res, url, kind, row, acc) {
 
 // ---------- the tour ----------
 
-const groupName = (company) => company.name || 'This company';
 const lastGrant = (req, prefix) => grantsOf(req).filter((g) => g.startsWith(prefix)).map((g) => g.slice(prefix.length)).at(-1);
 
 // The lenses this browser can switch between. Everyone, always; "You" once
@@ -260,7 +260,7 @@ async function lensesFor(req, { profile = null, company = null, who = null }) {
   if (!co) { const id = lastGrant(req, 'oc:'); co = id ? await store.company(id) : null; }
   return [
     { id: 'everyone', label: 'Everyone', href: '/' },
-    ...(co ? [{ id: 'company', label: groupName(co), href: `/c/${co.id}` }] : []),
+    ...(co ? [{ id: 'company', label: companyName(co), href: `/c/${co.id}` }] : []),
     ...(you ? [{ id: 'you', label: profile && who ? who.lens : 'You', href: `/u/${you.id}` }] : []),
   ];
 }
@@ -273,7 +273,7 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
   const t = { lens, home: '/', all: numbersOf(await store.totals('all')), counts: await store.counts(), group: null, me: null, owner: null, profile };
   t.counts.countries = t.all.where.filter((c) => c.id !== NO_COUNTRY).length;
   if (company) {
-    Object.assign(t, { group: numbersOf(await store.totals(`c:${company.id}`), new Date(), { minGroup: MIN_GROUP }), groupName: groupName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
+    Object.assign(t, { group: numbersOf(await store.totals(`c:${company.id}`), new Date(), { minGroup: MIN_GROUP }), groupName: companyName(company), home: `/c/${company.id}`, joinCompany: `/c/${company.id}/contribute` });
     if (acc?.owner) t.owner = { kind: 'c', edit: `/c/${company.id}/edit` };
   }
   if (profile) {
