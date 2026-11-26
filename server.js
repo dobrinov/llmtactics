@@ -635,7 +635,8 @@ async function handle(req, res) {
         people.set(key, seat);
       }
       const seats = [...people.values()];
-      return privateHtml(res, flow.companyProgressPage({ company, base: baseUrl(req), seats, owner: acc.owner }));
+      const last = await lastAnswered(req);
+      return privateHtml(res, flow.companyProgressPage({ company, base: baseUrl(req), seats, owner: acc.owner, lastAnswer: dueAgain(last) ? last : null }));
     }
     const t = await tourData(req, { company, acc });
     return comp[2] ? toolsRoute(res, t, comp[3]) : privateHtml(res, tourPage(t));
