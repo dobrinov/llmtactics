@@ -25,12 +25,14 @@
 .tour-side.prev { left: 24px; } .tour-side.next { right: 24px; }
 .tour-side[aria-disabled="true"] { opacity: 0; pointer-events: none; }
 .tour-side .tip { top: 56px; left: 50%; transform: translateX(-50%); }
+/* The arrows sit near the screen's edges: their tips line up with that edge, so they never widen the page. */
+.tour-side.prev .tip { left: 0; transform: none; } .tour-side.next .tip { left: auto; right: 0; transform: none; }
 
 /* Tooltips: .ht holds a .tip that shows on hover or keyboard focus. */
 .ht, .tdot-nav, .tc { position: relative; }
 .tour [hidden], .tools-page [hidden] { display: none !important; }
 .tip { position: absolute; z-index: 30; padding: 6px 10px; border-radius: 8px; background: var(--ink); color: #fff; font: 500 12px/1.45 var(--sans); white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.12s; text-align: left; letter-spacing: 0; text-transform: none; }
-.tip.wide { white-space: normal; width: 300px; padding: 10px 12px; font-size: 13px; }
+.tip.wide { white-space: normal; width: min(300px, calc(100vw - 48px)); padding: 10px 12px; font-size: 13px; }
 .tip a { color: #fff; }
 .tdot-nav .tip { top: 42px; left: 50%; transform: translateX(-50%); }
 .ht:hover > .tip, .ht:focus-visible > .tip, .ht:focus-within > .tip, .tdot-nav:hover .tip, .tdot-nav:focus-visible .tip, .tc:hover > .tip, .tc:focus-visible > .tip, .hdot:hover > .tip, .hdot:focus-visible > .tip, .tour-side:hover .tip { opacity: 1; }
@@ -228,6 +230,8 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tool-group h2 { position: sticky; top: 72px; align-self: start; padding-top: 18px; font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: #64748b; }
 .tool-group h2 small { display: block; margin-top: 4px; font: 500 11px var(--mono); letter-spacing: 0; text-transform: none; color: #94a3b8; }
 .tool-group ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px; }
+/* A long name is cut with an ellipsis rather than widening the page. */
+.tool-group li { min-width: 0; max-width: 100%; }
 .tool-tile { display: flex; align-items: center; gap: 10px; width: 210px; min-height: 56px; padding: 8px 12px 8px 8px; border-radius: 14px; border: 1px solid transparent; text-decoration: none; color: var(--ink); }
 .tool-tile:hover { background: #fff; border-color: #e2e8f0; color: var(--ink); }
 .tool-tile.dim { opacity: 0.45; }
@@ -235,7 +239,7 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .tool-tile-text { display: flex; flex-direction: column; min-width: 0; }
 .tool-tile-text strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool-tile-text span { font: 500 12px var(--mono); color: #64748b; }
-.tool-tile .tip { top: calc(100% + 6px); left: 8px; }
+.tool-tile .tip { top: calc(100% + 6px); left: 0; }
 .tool-detail { width: min(880px, calc(100% - 32px)); margin: 0 auto; padding: 16px 0 80px; display: flex; flex-direction: column; gap: 32px; }
 .tool-detail-head { display: flex; gap: 24px; align-items: center; }
 .tool-detail-head h1 { font: 700 clamp(40px, 6vw, 72px)/1 var(--head); letter-spacing: -0.03em; }
@@ -246,6 +250,10 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
 .month-cols i { display: block; width: 100%; border-radius: 6px 6px 0 0; }
 .month-cols b { position: absolute; bottom: -22px; left: 0; right: 0; text-align: center; font: 500 12px var(--mono); color: #64748b; }
 .month-cols .tip { bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%); }
+/* Months' tips open inwards from their bar: rightwards in the first half,
+   leftwards in the second, so they stay on a phone's screen. */
+:is(.month-cols, .mini-trend) > span:nth-child(-n+3) .tip { left: 0; transform: none; }
+:is(.month-cols, .mini-trend) > span:nth-last-child(-n+3) .tip { left: auto; right: 0; transform: none; }
 .with-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .with-list a { display: flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 14px; background: #fff; border: 1px solid #e2e8f0; text-decoration: none; color: var(--ink); }
 .with-list a > span:last-child { display: flex; flex-direction: column; }
@@ -265,7 +273,7 @@ body:has(:is(.ht, .tdot-nav, .tc, .hdot, .tour-side):hover) :is(.ht, .tdot-nav, 
   .sbar strong { font-size: 15px; }
   .join-cards { grid-template-columns: 1fr; width: 100%; }
   .counts-in { opacity: 1; }
-  .tool-group { grid-template-columns: 1fr; }
+  .tool-group { grid-template-columns: minmax(0, 1fr); }
   .tool-group h2 { position: static; padding-top: 8px; }
   .tool-tile { width: 100%; }
   .tool-detail-head { flex-direction: column; align-items: flex-start; }
