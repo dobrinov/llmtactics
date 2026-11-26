@@ -17,7 +17,12 @@ echo "==> shipping $(git log --oneline -1 "$REF")"
 git archive --format=tar "$REF" | ssh -i "$KEY" -o BatchMode=yes "$HOST" "
   set -euo pipefail
   cd /opt/apps/llmtactics
-  docker image inspect llmtactics:latest >/dev/null 2>&1 && docker tag llmtactics:latest llmtactics:previous
+  # Keep the running image as :previous. Docker sometimes refuses to move the
+  # tag (\"already exists\"); that only loses the shortcut, so carry on.
+  if docker image inspect llmtactics:latest >/dev/null 2>&1; then
+    docker tag llmtactics:latest llmtactics:previous 2>/dev/null \
+      || echo '    note: could not tag llmtactics:previous; roll back with deploy/ship.sh <sha>'
+  fi
   echo '==> building'
   docker build -q -t llmtactics:latest --label commit=$SHA - >/dev/null
   echo '==> starting'
