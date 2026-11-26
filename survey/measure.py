@@ -401,6 +401,7 @@ def patch_lines(text):  # lines a Codex patch adds: in "*** Begin Patch" format 
 # event is sometimes written twice, and a forked session copies the events before it: a reply is
 # one (time, running total) pair. OpenAI counts cached input inside input_tokens, and reasoning
 # inside output_tokens.
+codex_prompts = set()
 for path in codex_files:
     meta = codex_meta_of[path]
     if skipped(meta["cwd"]):
@@ -433,7 +434,9 @@ for path in codex_files:
         if kind == "event_msg" and p.get("type") == "user_message" and not sub:
             stamps[session].append(t)
             text = p.get("message")
-            if p.get("kind") in (None, "plain") and isinstance(text, str) and text.strip() and not text.lstrip().startswith(NOT_TYPED):
+            key = (o.get("timestamp"), text)  # a forked session copies the prompts before it
+            if p.get("kind") in (None, "plain") and isinstance(text, str) and text.strip() and not text.lstrip().startswith(NOT_TYPED) and key not in codex_prompts:
+                codex_prompts.add(key)
                 prompts[session] += 1
                 days.add(day_of(t))
         last = info.get("last_token_usage") if isinstance(info, dict) else None

@@ -260,9 +260,16 @@ async function companyWait(req, company) {
   return { token, headers: own ? {} : { 'Set-Cookie': waitCookie(req, token) } };
 }
 
+// Whether this browser has answered already, onto a page of its own. Such a
+// browser is offered to run it again, never to take part.
+async function tookPart(req) {
+  const own = await ownProfileId(req);
+  return own ? (await store.contributions({ profileId: own })).length > 0 : false;
+}
+
 // A person's page before its first answer.
 async function profileData(req, profile, acc) {
-  return { profile, companies: await store.companiesOf(profile.id), isOwner: acc.owner };
+  return { profile, companies: await store.companiesOf(profile.id), isOwner: acc.owner, tookPart: !acc.owner && await tookPart(req) };
 }
 
 // The page where a page is renamed, protected or deleted. Without the owner
@@ -355,9 +362,8 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
   // A browser with a page of its own runs the survey again onto it.
   const own = profile ? null : t.lenses.find((l) => l.id === 'you');
   if (own) t.again = `${own.href}/contribute`;
-  // Whether this browser has answered already, onto a page of its own: then
-  // the tour offers to run it again rather than to take part.
-  t.tookPart = profile ? Boolean(acc?.owner) : own ? (await store.contributions({ profileId: own.href.slice(3) })).length > 0 : false;
+  // On a person's own page they have answered (the tour shows only pages with an answer).
+  t.tookPart = profile && acc?.owner ? true : await tookPart(req);
   return t;
 }
 
