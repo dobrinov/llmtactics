@@ -316,20 +316,28 @@ async function tourData(req, { profile = null, company = null, acc = null }) {
 }
 
 // /tools and /tools/<slug> under a lens (`at` is '' or '/u/<id>' or '/c/<id>').
+// Every tool a page of this lens can link to, as { name, category }.
+const linkedTools = (t) => [
+  ...(t.group?.tools ?? []),
+  ...[t.all, t.group].filter(Boolean).flatMap((n) => n.setups.setups.flatMap((x) => x.tools)),
+  ...(t.me?.setupTools ?? []),
+];
 function toolsRoute(res, t, slug) {
   t.suffix = slug ? `/tools/${slug}` : '/tools';
   const send = privateHtml;
   if (!slug) return send(res, toolsIndexPage(t));
-  const at = t.all.tools.findIndex((x) => toolSlug(x.name) === slug);
-  if (at < 0) return html(res, views.notFoundPage(), 404);
-  const tool = t.all.tools[at];
   const list = t.all.tools;
+  const at = list.findIndex((x) => toolSlug(x.name) === slug);
+  // The tour also links to tools outside everyone's current list: in a
+  // company's or a person's setup, or only in older answers.
+  const tool = at >= 0 ? list[at] : linkedTools(t).find((x) => toolSlug(x.name) === slug);
+  if (!tool) return html(res, views.notFoundPage(), 404);
   return send(res, toolPage(t, {
     tool,
     detail: toolDetailOf(t.all.buckets, tool.name),
     groupDetail: t.group ? toolDetailOf(t.group.buckets, tool.name) : null,
-    prev: list.length > 1 ? list[(at - 1 + list.length) % list.length] : null,
-    next: list.length > 1 ? list[(at + 1) % list.length] : null,
+    prev: at >= 0 && list.length > 1 ? list[(at - 1 + list.length) % list.length] : null,
+    next: at >= 0 && list.length > 1 ? list[(at + 1) % list.length] : null,
   }));
 }
 
